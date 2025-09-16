@@ -70,7 +70,7 @@ npm run dev
   - `value1.toLowerCase() === value2.toLowerCase()` - 忽略大小写
   - `Math.abs(value1 - value2) < 100` - 数值差小于100
   - `value1.includes(value2) || value2.includes(value1)` - 包含关系
-  - 无限可能的自定义逻辑！
+  - 无限可能的自定义逻辑！详细教程请前往 [自定义规则](https://github.com/pdxjie/el-table-span-method/blob/master/%E8%87%AA%E5%AE%9A%E4%B9%89%E8%A7%84%E5%88%99%E6%95%99%E7%A8%8B.md)
 
 **精确范围控制**
 - 📍 **起始行设置**：从第 N 行开始合并
