@@ -1,17 +1,20 @@
 <template>
   <div class="config-panel">
-    <el-scrollbar height="100%">
+    <el-scrollbar class="config-scrollbar">
       <div class="panel-content">
+
         <!-- 数据导入区域 -->
         <div class="section-card">
           <div class="section-header">
-            <el-icon><Upload /></el-icon>
-            <span>数据导入</span>
+            <div class="section-title">
+              <el-icon class="section-icon"><Upload /></el-icon>
+              <span>数据导入</span>
+            </div>
           </div>
-          
+
           <div class="import-section">
             <el-upload
-              class="upload-demo"
+              class="upload-area"
               drag
               :auto-upload="false"
               :on-change="handleFileChange"
@@ -20,24 +23,35 @@
               accept=".json,.csv,.xlsx,.xls"
               :loading="uploading"
             >
-              <el-icon class="el-icon--upload" v-if="!uploading"><upload-filled /></el-icon>
-              <el-icon class="el-icon--loading" v-else><Loading /></el-icon>
-              <div class="el-upload__text" v-if="!uploading">
-                拖拽文件到此处或<em>点击上传</em>
-              </div>
-              <div class="el-upload__text" v-else>
-                正在处理文件...
-              </div>
-              <div class="el-upload__tip">
-                支持 JSON、CSV、Excel (.xlsx/.xls) 格式
+              <div class="upload-content">
+                <el-icon class="upload-icon" v-if="!uploading">
+                  <UploadFilled />
+                </el-icon>
+                <el-icon class="upload-icon loading" v-else>
+                  <Loading />
+                </el-icon>
+                <div class="upload-text">
+                  <p v-if="!uploading">拖拽文件到此处或<strong>点击选择</strong></p>
+                  <p v-else>正在处理文件...</p>
+                </div>
+                <div class="upload-hint">
+                  支持 JSON、CSV、Excel 格式
+                </div>
               </div>
             </el-upload>
-            
-            <el-divider>或</el-divider>
-            
-            <el-button type="primary" @click="loadSampleData" size="default" block>
-              <el-icon><Document /></el-icon>
-              加载示例数据
+
+            <div class="divider">
+              <span>或</span>
+            </div>
+
+            <el-button
+              type="primary"
+              @click="loadSampleData"
+              size="default"
+              class="sample-btn"
+              :icon="Document"
+            >
+              使用示例数据
             </el-button>
           </div>
         </div>
@@ -45,27 +59,31 @@
         <!-- 表格信息 -->
         <div class="section-card" v-if="tableInfo.rows > 0">
           <div class="section-header">
-            <el-icon><InfoFilled /></el-icon>
-            <span>表格信息</span>
+            <div class="section-title">
+              <el-icon class="section-icon"><InfoFilled /></el-icon>
+              <span>表格信息</span>
+            </div>
           </div>
-          
+
           <div class="table-info">
-            <div class="info-item">
-              <span class="label">数据行数:</span>
-              <el-tag type="success">{{ tableInfo.rows }}</el-tag>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">数据行数</span>
+                <el-tag type="success" size="default">{{ tableInfo.rows }}</el-tag>
+              </div>
+              <div class="info-item">
+                <span class="info-label">字段数量</span>
+                <el-tag type="info" size="default">{{ tableInfo.columns }}</el-tag>
+              </div>
             </div>
-            <div class="info-item">
-              <span class="label">字段数量:</span>
-              <el-tag type="info">{{ tableInfo.columns }}</el-tag>
-            </div>
-            <div class="info-item">
-              <span class="label">字段列表:</span>
+            <div class="field-section">
+              <span class="info-label">字段列表</span>
               <div class="field-tags">
-                <el-tag 
-                  v-for="field in tableInfo.fields" 
-                  :key="field" 
+                <el-tag
+                  v-for="field in tableInfo.fields"
+                  :key="field"
                   size="small"
-                  style="margin: 2px;"
+                  class="field-tag"
                 >
                   {{ field }}
                 </el-tag>
@@ -77,29 +95,33 @@
         <!-- 合并配置 -->
         <div class="section-card">
           <div class="section-header">
-            <el-icon><Setting /></el-icon>
-            <span>合并配置</span>
+            <div class="section-title">
+              <el-icon class="section-icon"><Setting /></el-icon>
+              <span>合并设置</span>
+            </div>
           </div>
-          
+
           <div class="merge-config">
-            <el-form :model="config" label-width="80px" size="default">
+            <el-form :model="config" label-position="top" size="default">
+
               <el-form-item label="合并类型">
-                <el-radio-group v-model="config.mergeType" @change="handleConfigChange">
-                  <el-radio value="row">行合并</el-radio>
-                  <el-radio value="column">列合并</el-radio>
-                  <el-radio value="mixed">混合合并</el-radio>
+                <el-radio-group v-model="config.mergeType" @change="handleConfigChange" class="merge-type-group">
+                  <el-radio-button value="row">行合并</el-radio-button>
+                  <el-radio-button value="column">列合并</el-radio-button>
+                  <el-radio-button value="mixed">混合合并</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              
-              <el-form-item label="合并列">
+
+              <el-form-item label="选择合并列">
                 <el-select
                   v-model="config.mergeColumns"
                   multiple
-                  placeholder="选择要合并的列"
+                  placeholder="请选择要合并的列"
                   style="width: 100%"
                   @change="handleConfigChange"
                   collapse-tags
                   collapse-tags-tooltip
+                  :disabled="tableInfo.fields.length === 0"
                 >
                   <el-option
                     v-for="field in tableInfo.fields"
@@ -109,14 +131,14 @@
                   />
                 </el-select>
               </el-form-item>
-              
+
               <el-form-item label="合并条件">
-                <el-radio-group v-model="config.mergeCondition" @change="handleConfigChange">
-                  <el-radio value="same">相同值合并</el-radio>
-                  <el-radio value="custom">自定义规则</el-radio>
+                <el-radio-group v-model="config.mergeCondition" @change="handleConfigChange" class="condition-group">
+                  <el-radio-button value="same">相同值合并</el-radio-button>
+                  <el-radio-button value="custom">自定义规则</el-radio-button>
                 </el-radio-group>
               </el-form-item>
-              
+
               <el-form-item v-if="config.mergeCondition === 'custom'" label="自定义规则">
                 <el-input
                   v-model="config.customRule"
@@ -127,16 +149,17 @@
                 />
                 <div class="rule-hint">
                   <el-text type="info" size="small">
+                    <el-icon><InfoFilled /></el-icon>
                     编写 JavaScript 表达式，参数为 value1 和 value2
                   </el-text>
                 </div>
               </el-form-item>
-              
+
               <el-form-item label="合并范围" v-if="tableInfo.rows > 0">
-                <div class="range-inputs">
-                  <el-input-number 
-                    v-model="config.startRow" 
-                    :min="0" 
+                <div class="range-controls">
+                  <el-input-number
+                    v-model="config.startRow"
+                    :min="0"
                     :max="Math.max(0, tableInfo.rows - 1)"
                     placeholder="起始行"
                     size="default"
@@ -144,9 +167,9 @@
                     @change="handleConfigChange"
                   />
                   <span class="range-separator">至</span>
-                  <el-input-number 
-                    v-model="config.endRow" 
-                    :min="config.startRow || 0" 
+                  <el-input-number
+                    v-model="config.endRow"
+                    :min="config.startRow || 0"
                     :max="Math.max(config.startRow || 0, tableInfo.rows - 1)"
                     placeholder="结束行"
                     size="default"
@@ -159,34 +182,36 @@
           </div>
         </div>
 
-        <!-- 预览设置 -->
+        <!-- 显示设置 -->
         <div class="section-card">
           <div class="section-header">
-            <el-icon><View /></el-icon>
-            <span>预览设置</span>
+            <div class="section-title">
+              <el-icon class="section-icon"><View /></el-icon>
+              <span>显示设置</span>
+            </div>
           </div>
-          
-          <div class="preview-settings">
-            <el-form size="default">
-              <el-form-item>
-                <div class="setting-item">
-                  <span class="setting-label">显示边框</span>
-                  <el-switch v-model="config.showBorder" @change="handleConfigChange" />
-                </div>
-              </el-form-item>
-              
-              <el-form-item>
-                <div class="setting-item">
-                  <span class="setting-label">斑马纹</span>
-                  <el-switch v-model="config.stripe" @change="handleConfigChange" />
-                </div>
-              </el-form-item>
-            </el-form>
+
+          <div class="display-settings">
+            <div class="setting-item">
+              <div class="setting-info">
+                <span class="setting-label">显示表格边框</span>
+                <span class="setting-desc">显示表格的边框线</span>
+              </div>
+              <el-switch v-model="config.showBorder" @change="handleConfigChange" />
+            </div>
+
+            <div class="setting-item">
+              <div class="setting-info">
+                <span class="setting-label">斑马纹样式</span>
+                <span class="setting-desc">交替显示行背景色</span>
+              </div>
+              <el-switch v-model="config.stripe" @change="handleConfigChange" />
+            </div>
           </div>
         </div>
       </div>
     </el-scrollbar>
-    
+
     <!-- Excel 表头选择对话框 -->
     <ExcelHeaderSelector
       v-model="showExcelHeaderSelector"
@@ -425,137 +450,148 @@ export default {
   background: transparent;
 }
 
+.config-scrollbar {
+  height: 100%;
+}
+
 .panel-content {
-  padding: 28px;
+  padding: 20px;
 }
 
 /* 区块卡片样式 */
 .section-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.section-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 20px;
+  margin-bottom: 16px;
+  transition: all 0.2s ease;
 }
 
 .section-card:last-child {
   margin-bottom: 0;
 }
 
+.section-card:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
 /* 区块标题样式 */
 .section-header {
+  margin-bottom: 16px;
+}
+
+.section-title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   font-weight: 600;
-  font-size: 16px;
-  color: #1e293b;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
-  position: relative;
+  font-size: 15px;
+  color: #111827;
 }
 
-.section-header::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 32px;
-  height: 2px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border-radius: 1px;
-}
-
-.section-header .el-icon {
+.section-icon {
   font-size: 18px;
-  color: #667eea;
+  color: #3b82f6;
 }
 
 /* 数据导入区域 */
 .import-section {
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.upload-demo {
+.upload-area {
   width: 100%;
-  margin-bottom: 20px;
 }
 
 :deep(.el-upload-dragger) {
   width: 100%;
-  height: 140px;
-  border: 2px dashed rgba(102, 126, 234, 0.3);
-  border-radius: 12px;
-  background: rgba(102, 126, 234, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: 120px;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  background-color: #f9fafb;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
 }
 
-.upload-demo::before {
+:deep(.el-upload-dragger:hover) {
+  border-color: #3b82f6;
+  background-color: #eff6ff;
+}
+
+.upload-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+}
+
+.upload-icon {
+  font-size: 32px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.upload-icon.loading {
+  animation: rotate 1s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.upload-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.upload-text strong {
+  color: #3b82f6;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.divider {
+  text-align: center;
+  position: relative;
+  margin: 8px 0;
+}
+
+.divider::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
-  transition: left 0.6s ease;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-color: #e5e7eb;
+  z-index: 0;
 }
 
-:deep(.el-upload-dragger:hover) {
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.1);
-  transform: translateY(-1px);
-}
-
-.upload-demo:hover::before {
-  left: 100%;
-}
-
-:deep(.el-upload-dragger .el-icon) {
-  font-size: 40px;
-  color: #94a3b8;
-  margin-bottom: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-:deep(.el-upload-dragger:hover .el-icon) {
-  color: #667eea;
-  transform: scale(1.05);
-}
-
-:deep(.el-upload-dragger .el-upload__text) {
-  color: #475569;
-  font-size: 15px;
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-
-:deep(.el-upload-dragger .el-upload__tip) {
-  color: #64748b;
+.divider span {
+  background-color: #ffffff;
+  padding: 0 12px;
+  color: #6b7280;
   font-size: 13px;
+  position: relative;
+  z-index: 1;
 }
 
-:deep(.el-divider) {
-  margin: 16px 0;
-  border-color: #dee2e6;
-}
-
-:deep(.el-divider__text) {
-  background: white;
-  color: #6c757d;
-  font-size: 12px;
-  font-weight: 400;
+.sample-btn {
+  width: 100%;
 }
 
 /* 表格信息样式 */
@@ -565,89 +601,99 @@ export default {
   gap: 16px;
 }
 
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
 .info-item {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: rgba(102, 126, 234, 0.08);
-  border-radius: 10px;
-  border-left: 4px solid #667eea;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  border: 1px solid #f3f4f6;
 }
 
-.info-item:hover {
-  background: rgba(102, 126, 234, 0.12);
-  transform: translateX(2px);
+.info-label {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
 }
 
-.info-item .label {
-  font-weight: 600;
-  color: #334155;
-  min-width: 80px;
-  flex-shrink: 0;
-  font-size: 14px;
+.field-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .field-tags {
-  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-:deep(.el-tag) {
-  border-radius: 6px;
-  border: none;
-  font-weight: 500;
+.field-tag {
+  background-color: #eff6ff;
+  border-color: #dbeafe;
+  color: #1e40af;
 }
 
 /* 表单样式优化 */
-.merge-config .el-form-item {
-  margin-bottom: 24px;
-}
-
-.preview-settings .el-form-item {
+.merge-config :deep(.el-form-item) {
   margin-bottom: 20px;
 }
 
-:deep(.el-form-item__label) {
+.merge-config :deep(.el-form-item__label) {
   font-weight: 600;
-  color: #2c3e50;
+  color: #374151;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.5;
+  margin-bottom: 8px;
 }
 
-:deep(.el-radio-group) {
+/* 单选按钮组样式 */
+.merge-type-group,
+.condition-group {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  width: 100%;
 }
 
-:deep(.el-radio) {
-  margin-right: 0;
-  padding: 14px 18px;
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.8);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+:deep(.el-radio-button) {
+  flex: 1;
 }
 
-:deep(.el-radio:hover) {
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.08);
-  transform: translateY(-1px);
-}
-
-:deep(.el-radio.is-checked) {
-  border-color: #667eea;
-  background: rgba(102, 126, 234, 0.15);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
-}
-
-:deep(.el-radio__label) {
+:deep(.el-radio-button__inner) {
+  width: 100%;
+  border-radius: 6px;
+  border-color: #d1d5db;
+  color: #374151;
   font-weight: 500;
-  color: #334155;
+  transition: all 0.2s ease;
+}
+
+:deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+:deep(.el-radio-button:last-child .el-radio-button__inner) {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+:deep(.el-radio-button__inner:hover) {
+  border-color: #3b82f6;
+  background-color: #f0f9ff;
+}
+
+:deep(.el-radio-button.is-active .el-radio-button__inner) {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+  box-shadow: none;
 }
 
 /* 选择器样式 */
@@ -656,34 +702,35 @@ export default {
 }
 
 :deep(.el-select .el-input__wrapper) {
-  border-radius: 4px;
-  border: 1px solid #ced4da;
+  border-radius: 6px;
+  border-color: #d1d5db;
   box-shadow: none;
+  transition: all 0.2s ease;
 }
 
 :deep(.el-select .el-input__wrapper:hover) {
-  border-color: #007bff;
+  border-color: #9ca3af;
 }
 
 :deep(.el-select .el-input__wrapper.is-focus) {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* 数字输入框样式 */
-.range-inputs {
+.range-controls {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
 }
 
-.range-inputs .el-input-number {
+.range-controls .el-input-number {
   flex: 1;
 }
 
 .range-separator {
-  color: #8c8c8c;
+  color: #6b7280;
   font-size: 14px;
   font-weight: 500;
   padding: 0 4px;
@@ -694,178 +741,168 @@ export default {
 }
 
 :deep(.el-input-number .el-input__wrapper) {
-  border-radius: 4px;
-  border: 1px solid #ced4da;
-  background: white;
+  border-radius: 6px;
+  border-color: #d1d5db;
+  box-shadow: none;
+  transition: all 0.2s ease;
 }
 
 :deep(.el-input-number .el-input__wrapper:hover) {
-  border-color: #007bff;
+  border-color: #9ca3af;
 }
 
 :deep(.el-input-number .el-input__wrapper.is-focus) {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-:deep(.el-input-number .el-input__inner) {
-  text-align: center;
-  font-weight: 400;
-  color: #495057;
-}
-
-:deep(.el-input-number__decrease),
-:deep(.el-input-number__increase) {
-  border: none;
-  background: transparent;
-  color: #6c757d;
-}
-
-:deep(.el-input-number__decrease:hover),
-:deep(.el-input-number__increase:hover) {
-  color: #007bff;
-  background: rgba(0, 123, 255, 0.1);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* 文本域样式 */
 :deep(.el-textarea .el-textarea__inner) {
-  border-radius: 4px;
-  border: 1px solid #ced4da;
+  border-radius: 6px;
+  border-color: #d1d5db;
   font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.5;
+  transition: all 0.2s ease;
 }
 
 :deep(.el-textarea .el-textarea__inner:hover) {
-  border-color: #007bff;
+  border-color: #9ca3af;
 }
 
 :deep(.el-textarea .el-textarea__inner:focus) {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* 提示文本 */
 .rule-hint {
-  margin-top: 6px;
-  padding: 6px 8px;
-  background: #e7f1ff;
-  border-radius: 4px;
-  border-left: 2px solid #007bff;
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f0f9ff;
+  border-radius: 6px;
+  border-left: 3px solid #3b82f6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 /* 设置项样式 */
+.display-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .setting-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  width: 100%;
-  padding: 18px 20px;
-  background: rgba(255, 255, 255, 0.8);
-  border-radius: 10px;
-  border: 1px solid rgba(102, 126, 234, 0.15);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  justify-content: space-between;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+  transition: all 0.2s ease;
 }
 
 .setting-item:hover {
-  background: rgba(102, 126, 234, 0.08);
-  border-color: rgba(102, 126, 234, 0.3);
-  transform: translateY(-1px);
+  background: #f3f4f6;
+  border-color: #e5e7eb;
+}
+
+.setting-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .setting-label {
   font-weight: 500;
-  color: #334155;
+  color: #374151;
   font-size: 14px;
+}
+
+.setting-desc {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* 开关样式 */
+:deep(.el-switch) {
+  --el-switch-on-color: #3b82f6;
+  --el-switch-off-color: #d1d5db;
 }
 
 /* 按钮样式 */
 :deep(.el-button) {
   font-weight: 500;
-  border-radius: 10px;
-  padding: 12px 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 :deep(.el-button--primary) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border: none;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 :deep(.el-button--primary:hover) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+  background-color: #2563eb;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px 0 rgba(59, 130, 246, 0.3);
 }
 
-/* 开关样式 */
-:deep(.el-switch) {
-  --el-switch-on-color: #667eea;
-  --el-switch-off-color: #cbd5e1;
+/* 标签样式 */
+:deep(.el-tag) {
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
 }
 
-:deep(.el-switch .el-switch__core) {
-  border-radius: 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+:deep(.el-tag--success) {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+:deep(.el-tag--info) {
+  background-color: #f1f5f9;
+  color: #475569;
 }
 
 /* 响应式设计 */
-@media (max-width: 1200px) {
-  .panel-content {
-    padding: 16px;
-  }
-  
-  .section-card {
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-  
-  .section-header {
-    font-size: 16px;
-  }
-}
-
 @media (max-width: 768px) {
   .panel-content {
-    padding: 12px;
+    padding: 16px;
   }
-  
+
   .section-card {
     padding: 16px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
   }
-  
-  .section-header {
-    font-size: 16px;
+
+  .info-grid {
+    grid-template-columns: 1fr;
     gap: 8px;
   }
-  
-  .range-inputs {
+
+  .range-controls {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .range-separator {
     text-align: center;
     margin: 8px 0;
   }
-  
-  .info-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-  
-  .info-item .label {
-    min-width: auto;
-  }
-  
+
   :deep(.el-upload-dragger) {
-    height: 140px;
+    height: 100px;
   }
-  
-  :deep(.el-radio) {
-    padding: 10px 12px;
+
+  .upload-icon {
+    font-size: 28px;
+    margin-bottom: 6px;
   }
 }
 
@@ -880,17 +917,11 @@ export default {
 }
 
 :deep(.el-scrollbar__thumb) {
-  background-color: #c1c1c1;
+  background-color: #d1d5db;
   border-radius: 4px;
 }
 
 :deep(.el-scrollbar__thumb:hover) {
-  background-color: #a8a8a8;
+  background-color: #9ca3af;
 }
-
-/* 加载状态 */
-:deep(.el-loading-mask) {
-  border-radius: 12px;
-}
-
 </style>

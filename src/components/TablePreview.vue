@@ -1,48 +1,82 @@
 <template>
   <div class="table-preview">
-    <div class="card-header">
-      <span>
-        <el-icon><Grid /></el-icon>
-        表格预览
-      </span>
+    <div class="preview-header">
+      <div class="header-info">
+        <div class="title-section">
+          <h3 class="preview-title">表格预览</h3>
+          <span class="data-count" v-if="tableData.length > 0">
+            {{ tableData.length }} 行数据
+          </span>
+        </div>
+      </div>
+
       <div class="header-actions">
-        <el-button size="small" @click="refreshPreview">
-          <el-icon><Refresh /></el-icon>
+        <el-button
+          size="small"
+          :icon="Refresh"
+          @click="refreshPreview"
+          type="default"
+        >
           刷新
         </el-button>
       </div>
     </div>
-    
+
     <div class="preview-content">
-      <el-table
-        v-if="tableData.length > 0"
-        :data="tableData"
-        :span-method="spanMethod"
-        :border="spanConfig.showBorder"
-        :stripe="spanConfig.stripe"
-        style="width: 100%"
-      >
-        <el-table-column
-          v-for="(field, index) in tableFields"
-          :key="field"
-          :prop="field"
-          :label="field"
-          :width="getColumnWidth(field)"
-          show-overflow-tooltip
+      <div class="table-container" v-if="tableData.length > 0">
+        <el-table
+          :data="tableData"
+          :span-method="spanMethod"
+          :border="spanConfig.showBorder"
+          :stripe="spanConfig.stripe"
+          style="width: 100%"
+          class="preview-table"
         >
-          <template #default="scope">
-            <div class="cell-content">
-              {{ scope.row[field] }}
-            </div>
+          <el-table-column
+            v-for="(field, index) in tableFields"
+            :key="field"
+            :prop="field"
+            :label="field"
+            :width="getColumnWidth(field)"
+            show-overflow-tooltip
+            :class-name="''"
+          >
+            <template #default="scope">
+              <div class="cell-content">
+                {{ scope.row[field] }}
+              </div>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <div class="empty-state" v-else>
+        <el-empty
+          description="暂无表格数据"
+          :image-size="80"
+        >
+          <template #description>
+            <p class="empty-text">请先在左侧配置面板中导入数据</p>
           </template>
-        </el-table-column>
-      </el-table>
-      
-      <el-empty 
-        v-else 
-        description="暂无数据，请先导入数据"
-        :image-size="100"
-      />
+          <template #default>
+            <el-button type="primary" size="small">
+              导入数据
+            </el-button>
+          </template>
+        </el-empty>
+      </div>
+    </div>
+
+    <!-- 合并信息提示 -->
+    <div class="merge-info" v-if="tableData.length > 0 && spanConfig.mergeColumns.length > 0">
+      <div class="info-item">
+        <el-tag size="small" type="success">
+          {{ spanConfig.mergeType === 'row' ? '行合并' : spanConfig.mergeType === 'column' ? '列合并' : '混合合并' }}
+        </el-tag>
+        <span class="info-text">
+          合并列: {{ spanConfig.mergeColumns.join(', ') }}
+        </span>
+      </div>
     </div>
   </div>
 </template>
@@ -171,14 +205,25 @@ export default {
     }
 
     const refreshPreview = () => {
-      // 刷新预览（如果需要的话）
+      // 强制重新渲染表格
+      // 可以在这里添加刷新逻辑
+    }
+
+    const getMergedColumnClass = (field) => {
+      return ''
+    }
+
+    const getCellClass = (row, field) => {
+      return ''
     }
 
     return {
       tableFields,
       spanMethod,
       getColumnWidth,
-      refreshPreview
+      refreshPreview,
+      getMergedColumnClass,
+      getCellClass
     }
   }
 }
@@ -187,28 +232,46 @@ export default {
 <style scoped>
 .table-preview {
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 200px);
 }
 
-.card-header {
+/* 预览头部 */
+.preview-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-weight: 600;
-  color: #1e293b;
+  padding: 0 0 16px 0;
+  border-bottom: 1px solid #f0f0f0;
   margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.1);
+  flex-shrink: 0;
 }
 
-.card-header > span {
+.header-info {
+  flex: 1;
+}
+
+.title-section {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
+  gap: 12px;
 }
 
-.card-header .el-icon {
-  color: #667eea;
+.preview-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.data-count {
+  font-size: 13px;
+  color: #6b7280;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
 }
 
 .header-actions {
@@ -217,80 +280,250 @@ export default {
   gap: 8px;
 }
 
+/* 预览内容 */
 .preview-content {
-  max-height: 500px;
-  overflow: auto;
-  border: 1px solid rgba(102, 126, 234, 0.2);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
 }
 
-.cell-content {
-  padding: 2px;
+.table-container {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* 表格样式 */
+.preview-table {
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 :deep(.el-table) {
-  border-radius: 12px;
-  overflow: hidden;
   background: transparent;
+  border-radius: 8px;
 }
 
 :deep(.el-table .el-table__cell) {
-  padding: 12px 10px;
-  border-color: rgba(102, 126, 234, 0.1);
+  padding: 12px 8px;
+  border-color: #f0f0f0;
+  font-size: 14px;
 }
 
 :deep(.el-table th.el-table__cell) {
-  background: rgba(102, 126, 234, 0.08);
-  color: #334155;
+  background: #f9fafb;
+  color: #374151;
   font-weight: 600;
-  border-color: rgba(102, 126, 234, 0.1);
-}
-
-:deep(.el-table--border .el-table__cell) {
-  border-right: 1px solid #dee2e6;
-}
-
-:deep(.el-table--border .el-table__row:last-child .el-table__cell) {
-  border-bottom: 1px solid #dee2e6;
-}
-
-:deep(.el-table .el-table__body tr:hover > td) {
-  background-color: rgba(102, 126, 234, 0.05);
-}
-
-.el-empty {
-  padding: 40px 20px;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px dashed #ced4da;
-}
-
-:deep(.el-empty__image) {
-  width: 60px;
-  height: 60px;
-}
-
-:deep(.el-empty__description) {
-  color: #6c757d;
+  border-color: #e5e7eb;
   font-size: 13px;
 }
 
-/* 响应式调整 */
+:deep(.el-table--border .el-table__cell) {
+  border-right: 1px solid #f0f0f0;
+}
+
+:deep(.el-table .el-table__body tr:hover > td) {
+  background-color: #f8fafc;
+}
+
+:deep(.el-table--striped .el-table__body tr.el-table__row--striped td) {
+  background-color: #fafafa;
+}
+
+:deep(.el-table--striped .el-table__body tr.el-table__row--striped:hover td) {
+  background-color: #f5f5f5;
+}
+
+/* 单元格内容 */
+.cell-content {
+  line-height: 1.5;
+  word-break: break-word;
+  position: relative;
+}
+
+/* 空状态 */
+.empty-state {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: #fafbfc;
+}
+
+.empty-text {
+  margin: 8px 0 16px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+:deep(.el-empty) {
+  padding: 20px;
+}
+
+:deep(.el-empty__image) {
+  width: 80px;
+  height: 80px;
+}
+
+:deep(.el-empty__description) {
+  color: #6b7280;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+/* 合并信息 */
+.merge-info {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #f0f9ff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  border-left: 4px solid #3b82f6;
+  flex-shrink: 0;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-text {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* 按钮样式 */
+:deep(.el-button) {
+  font-weight: 500;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+:deep(.el-button--default) {
+  background-color: #ffffff;
+  border-color: #d1d5db;
+  color: #374151;
+}
+
+:deep(.el-button--default:hover) {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+  color: #111827;
+}
+
+:deep(.el-button--primary) {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+:deep(.el-button--primary:hover) {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+/* 标签样式 */
+:deep(.el-tag) {
+  border-radius: 6px;
+  border: none;
+  font-weight: 500;
+}
+
+:deep(.el-tag--success) {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .preview-content {
-    max-height: 400px;
-  }
-  
-  .header-actions {
+  .preview-header {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+  }
+
+  .header-actions {
+    align-self: stretch;
+  }
+
+  .title-section {
+    gap: 8px;
+  }
+
+  .preview-title {
+    font-size: 15px;
+  }
+
+  .table-container {
+    height: 100%;
+  }
+
+  :deep(.el-table .el-table__cell) {
+    padding: 8px 6px;
+    font-size: 13px;
+  }
+
+  .empty-state {
+    padding: 20px 16px;
+  }
+
+  .merge-info {
+    margin-top: 8px;
+    padding: 8px 12px;
+  }
+
+  .info-item {
+    flex-direction: column;
+    align-items: flex-start;
     gap: 4px;
   }
-  
+}
+
+@media (max-width: 480px) {
+  .data-count {
+    font-size: 12px;
+    padding: 2px 6px;
+  }
+
+  .table-container {
+    height: 100%;
+  }
+
   :deep(.el-table .el-table__cell) {
-    padding: 8px 4px;
+    padding: 6px 4px;
     font-size: 12px;
   }
+
+  :deep(.el-table th.el-table__cell) {
+    font-size: 12px;
+  }
+}
+
+/* 滚动条优化 */
+.table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 </style>
