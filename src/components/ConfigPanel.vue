@@ -399,16 +399,146 @@ export default {
 
     const loadSampleData = () => {
       const sampleData = [
-        { name: '张三', department: '技术部', position: '工程师', salary: 8000, level: 'P5' },
-        { name: '李四', department: '技术部', position: '工程师', salary: 8500, level: 'P5' },
-        { name: '王五', department: '技术部', position: '高级工程师', salary: 12000, level: 'P6' },
-        { name: '赵六', department: '市场部', position: '专员', salary: 6000, level: 'P4' },
-        { name: '钱七', department: '市场部', position: '专员', salary: 6200, level: 'P4' },
-        { name: '孙八', department: '市场部', position: '经理', salary: 15000, level: 'P7' },
-        { name: '周九', department: '人事部', position: '专员', salary: 5500, level: 'P4' },
-        { name: '吴十', department: '人事部', position: '经理', salary: 13000, level: 'P7' },
-        { name: '郑一', department: '财务部', position: '会计', salary: 7000, level: 'P5' },
-        { name: '王二', department: '财务部', position: '会计', salary: 7200, level: 'P5' }
+        {
+          name: '张三',
+          department: '技术部',
+          position: '工程师',
+          salary: 8000,
+          level: 'P5',
+          email: 'zhangsan@company.com',
+          phone: '13812345678',
+          address: '北京市朝阳区',
+          joinDate: '2020-01-15',
+          manager: '李经理',
+          project: '电商系统',
+          skill: 'Vue.js'
+        },
+        {
+          name: '李四',
+          department: '技术部',
+          position: '工程师',
+          salary: 8500,
+          level: 'P5',
+          email: 'lisi@company.com',
+          phone: '13912345678',
+          address: '北京市海淀区',
+          joinDate: '2020-03-20',
+          manager: '李经理',
+          project: '电商系统',
+          skill: 'React.js'
+        },
+        {
+          name: '王五',
+          department: '技术部',
+          position: '高级工程师',
+          salary: 12000,
+          level: 'P6',
+          email: 'wangwu@company.com',
+          phone: '13712345678',
+          address: '北京市西城区',
+          joinDate: '2019-06-10',
+          manager: '李经理',
+          project: '支付系统',
+          skill: 'Node.js'
+        },
+        {
+          name: '赵六',
+          department: '市场部',
+          position: '专员',
+          salary: 6000,
+          level: 'P4',
+          email: 'zhaoliu@company.com',
+          phone: '13612345678',
+          address: '上海市浦东区',
+          joinDate: '2021-02-08',
+          manager: '王经理',
+          project: '品牌推广',
+          skill: '营销策划'
+        },
+        {
+          name: '钱七',
+          department: '市场部',
+          position: '专员',
+          salary: 6200,
+          level: 'P4',
+          email: 'qianqi@company.com',
+          phone: '13512345678',
+          address: '上海市黄浦区',
+          joinDate: '2021-04-12',
+          manager: '王经理',
+          project: '品牌推广',
+          skill: '数据分析'
+        },
+        {
+          name: '孙八',
+          department: '市场部',
+          position: '经理',
+          salary: 15000,
+          level: 'P7',
+          email: 'sunba@company.com',
+          phone: '13412345678',
+          address: '上海市静安区',
+          joinDate: '2018-09-25',
+          manager: '总监',
+          project: '整体营销',
+          skill: '团队管理'
+        },
+        {
+          name: '周九',
+          department: '人事部',
+          position: '专员',
+          salary: 5500,
+          level: 'P4',
+          email: 'zhoujiu@company.com',
+          phone: '13312345678',
+          address: '广州市天河区',
+          joinDate: '2021-07-01',
+          manager: '人事经理',
+          project: '招聘管理',
+          skill: '人事管理'
+        },
+        {
+          name: '吴十',
+          department: '人事部',
+          position: '经理',
+          salary: 13000,
+          level: 'P7',
+          email: 'wushi@company.com',
+          phone: '13212345678',
+          address: '广州市越秀区',
+          joinDate: '2017-11-30',
+          manager: '人事总监',
+          project: '人才战略',
+          skill: '人力资源'
+        },
+        {
+          name: '郑一',
+          department: '财务部',
+          position: '会计',
+          salary: 7000,
+          level: 'P5',
+          email: 'zhengyi@company.com',
+          phone: '13112345678',
+          address: '深圳市南山区',
+          joinDate: '2020-05-18',
+          manager: '财务经理',
+          project: '财务核算',
+          skill: '财务分析'
+        },
+        {
+          name: '王二',
+          department: '财务部',
+          position: '会计',
+          salary: 7200,
+          level: 'P5',
+          email: 'wanger@company.com',
+          phone: '13012345678',
+          address: '深圳市福田区',
+          joinDate: '2020-08-22',
+          manager: '财务经理',
+          project: '财务核算',
+          skill: '成本控制'
+        }
       ]
       
       tableData.value = sampleData
@@ -659,6 +789,10 @@ export default {
 .condition-group {
   display: flex;
   width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
 
 :deep(.el-radio-button) {
@@ -667,33 +801,36 @@ export default {
 
 :deep(.el-radio-button__inner) {
   width: 100%;
-  border-radius: 6px;
-  border-color: #d1d5db;
+  border-radius: 0;
+  border: none;
+  border-right: 1px solid #e5e7eb;
   color: #374151;
   font-weight: 500;
   transition: all 0.2s ease;
+  background: #ffffff;
 }
 
 :deep(.el-radio-button:first-child .el-radio-button__inner) {
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
+  border-left: none;
 }
 
 :deep(.el-radio-button:last-child .el-radio-button__inner) {
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
+  border-right: none;
 }
 
 :deep(.el-radio-button__inner:hover) {
-  border-color: #3b82f6;
   background-color: #f0f9ff;
+  color: #3b82f6;
+  z-index: 1;
+  position: relative;
 }
 
 :deep(.el-radio-button.is-active .el-radio-button__inner) {
   background-color: #3b82f6;
-  border-color: #3b82f6;
   color: #ffffff;
-  box-shadow: none;
+  border-color: transparent;
+  z-index: 2;
+  position: relative;
 }
 
 /* 选择器样式 */
@@ -742,7 +879,7 @@ export default {
 
 :deep(.el-input-number .el-input__wrapper) {
   border-radius: 6px;
-  border-color: #d1d5db;
+  border: 1px solid #d1d5db;
   box-shadow: none;
   transition: all 0.2s ease;
 }

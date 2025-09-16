@@ -7,6 +7,9 @@
           <span class="data-count" v-if="tableData.length > 0">
             {{ tableData.length }} 行数据
           </span>
+          <span class="column-count" v-if="tableFields.length > 6">
+            {{ tableFields.length }} 列 - 可横向滚动
+          </span>
         </div>
       </div>
 
@@ -23,13 +26,14 @@
     </div>
 
     <div class="preview-content">
-      <div class="table-container" v-if="tableData.length > 0">
+      <div class="table-container" v-if="tableData.length > 0" :data-columns="tableFields.length">
         <el-table
           :data="tableData"
           :span-method="spanMethod"
           :border="spanConfig.showBorder"
           :stripe="spanConfig.stripe"
-          style="width: 100%"
+          height="100%"
+          :style="{ width: tableScrollWidth, minWidth: tableScrollWidth }"
           class="preview-table"
         >
           <el-table-column
@@ -37,7 +41,7 @@
             :key="field"
             :prop="field"
             :label="field"
-            :width="getColumnWidth(field)"
+            :min-width="getColumnMinWidth(field)"
             show-overflow-tooltip
             :class-name="''"
           >
@@ -195,13 +199,24 @@ export default {
       return value1 === value2
     }
 
-    const getColumnWidth = (field) => {
-      // 根据字段内容动态计算列宽
+    const getColumnMinWidth = (field) => {
+      const columnCount = tableFields.value.length
+
+      // 计算字段名和内容的最大长度
       const maxLength = Math.max(
         field.length,
         ...props.tableData.map(row => String(row[field] || '').length)
       )
-      return Math.min(Math.max(maxLength * 12 + 40, 120), 200)
+
+      // 根据列数调整最小宽度策略
+      if (columnCount <= 5) {
+        // 列数少时，让列自动扩展填充表格
+        return Math.max(maxLength * 8 + 40, 120)
+      } else {
+        // 列数多时，设置固定的合理宽度，确保所有列都能显示
+        const baseWidth = Math.max(maxLength * 6 + 32, 100)
+        return Math.min(baseWidth, 150) // 限制最大宽度避免过宽
+      }
     }
 
     const refreshPreview = () => {
@@ -217,13 +232,36 @@ export default {
       return ''
     }
 
+    // 计算表格需要的总宽度
+    const tableScrollWidth = computed(() => {
+      const columnCount = tableFields.value.length
+      if (columnCount === 0) return '100%'
+
+      // 如果列数较少，使用自适应宽度
+      if (columnCount <= 6) {
+        return '100%'
+      }
+
+      // 计算所有列的最小宽度总和
+      const totalWidth = tableFields.value.reduce((total, field) => {
+        return total + getColumnMinWidth(field)
+      }, 0)
+
+      // 为多列表格设置固定宽度，确保有滚动条
+      const minScrollWidth = columnCount * 120 // 每列至少120px
+      const calculatedWidth = Math.max(totalWidth, minScrollWidth, 1400)
+
+      return calculatedWidth + 'px'
+    })
+
     return {
       tableFields,
       spanMethod,
-      getColumnWidth,
+      getColumnMinWidth,
       refreshPreview,
       getMergedColumnClass,
-      getCellClass
+      getCellClass,
+      tableScrollWidth
     }
   }
 }
@@ -274,6 +312,15 @@ export default {
   font-weight: 500;
 }
 
+.column-count {
+  font-size: 12px;
+  color: #f59e0b;
+  background: #fef3c7;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -296,23 +343,29 @@ export default {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  width: 100%;
+  position: relative;
 }
 
 /* 表格样式 */
 .preview-table {
   border-radius: 8px;
-  overflow: hidden;
+  min-width: fit-content;
 }
 
 :deep(.el-table) {
   background: transparent;
   border-radius: 8px;
+  min-width: fit-content;
 }
 
 :deep(.el-table .el-table__cell) {
   padding: 12px 8px;
   border-color: #f0f0f0;
   font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 :deep(.el-table th.el-table__cell) {
@@ -514,16 +567,42 @@ export default {
 }
 
 .table-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #f1f5f9;
   border-radius: 4px;
 }
 
 .table-container::-webkit-scrollbar-thumb {
   background: #d1d5db;
   border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
 .table-container::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
+}
+
+.table-container::-webkit-scrollbar-corner {
+  background: #f1f5f9;
+}
+
+/* 表格列数提示 */
+.table-container::before {
+  content: attr(data-columns) " 列数据";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.table-container:hover::before {
+  opacity: 1;
 }
 </style>
