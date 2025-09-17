@@ -135,11 +135,13 @@
               <el-form-item label="合并条件">
                 <el-radio-group v-model="config.mergeCondition" @change="handleConfigChange" class="condition-group">
                   <el-radio-button value="same">相同值合并</el-radio-button>
-                  <el-radio-button value="custom">自定义规则</el-radio-button>
+                  <el-radio-button value="custom">简单规则</el-radio-button>
+                  <el-radio-button value="advanced">高级规则</el-radio-button>
                 </el-radio-group>
               </el-form-item>
 
-              <el-form-item v-if="config.mergeCondition === 'custom'" label="自定义规则">
+              <!-- 简单自定义规则 -->
+              <el-form-item v-if="config.mergeCondition === 'custom'" label="简单自定义规则">
                 <el-input
                   v-model="config.customRule"
                   type="textarea"
@@ -153,6 +155,15 @@
                     编写 JavaScript 表达式，参数为 value1 和 value2
                   </el-text>
                 </div>
+              </el-form-item>
+
+              <!-- 高级规则编辑器 -->
+              <el-form-item v-if="config.mergeCondition === 'advanced'" label="高级自定义规则">
+                <AdvancedRuleEditor
+                  v-model="config.customRule"
+                  :sample-data="sampleDataForRules"
+                  @rule-change="handleAdvancedRuleChange"
+                />
               </el-form-item>
 
               <el-form-item label="合并范围" v-if="tableInfo.rows > 0">
@@ -228,6 +239,7 @@ import { Upload, UploadFilled, InfoFilled, Setting, View, Loading, Document } fr
 import { ElMessage, ElNotification } from 'element-plus'
 import { fileProcessor } from '@/utils/fileProcessor.js'
 import ExcelHeaderSelector from './ExcelHeaderSelector.vue'
+import AdvancedRuleEditor from './AdvancedRuleEditor.vue'
 
 export default {
   name: 'ConfigPanel',
@@ -239,7 +251,8 @@ export default {
     View,
     Loading,
     Document,
-    ExcelHeaderSelector
+    ExcelHeaderSelector,
+    AdvancedRuleEditor
   },
   emits: ['data-change', 'config-change'],
   setup(props, { emit }) {
@@ -556,6 +569,36 @@ export default {
       emit('config-change', { ...config })
     }
 
+    // 高级规则相关方法
+    const sampleDataForRules = computed(() => {
+      if (tableData.value.length === 0) return []
+      
+      // 提取前几行数据用于规则测试
+      const sampleRows = tableData.value.slice(0, 5)
+      const sampleValues = []
+      
+      // 从选中的合并列中提取样本值
+      for (const column of config.mergeColumns) {
+        for (const row of sampleRows) {
+          if (row[column] !== undefined) {
+            sampleValues.push(row[column])
+          }
+        }
+      }
+      
+      return [...new Set(sampleValues)] // 去重
+    })
+
+    const handleAdvancedRuleChange = (ruleData) => {
+      // 更新配置时的额外逻辑，比如验证结果提示
+      if (ruleData.validation && !ruleData.validation.valid) {
+        ElMessage.warning('规则语法有误，请检查')
+      }
+      
+      // 触发配置变化
+      handleConfigChange()
+    }
+
     return {
       tableData,
       uploading,
@@ -563,10 +606,12 @@ export default {
       tableInfo,
       currentExcelData,
       showExcelHeaderSelector,
+      sampleDataForRules,
       beforeUpload,
       handleFileChange,
       loadSampleData,
       handleConfigChange,
+      handleAdvancedRuleChange,
       handleExcelHeaderConfirm,
       handleExcelHeaderCancel
     }
@@ -924,6 +969,21 @@ export default {
   gap: 6px;
 }
 
+/* 规则编辑器容器 */
+.rule-editor-container {
+  display: block;
+  width: 100%;
+}
+
+.simple-editor {
+  display: block;
+  width: 100%;
+}
+
+.simple-editor .el-textarea {
+  width: 100%;
+}
+
 /* 设置项样式 */
 .display-settings {
   display: flex;
@@ -1060,5 +1120,17 @@ export default {
 
 :deep(.el-scrollbar__thumb:hover) {
   background-color: #9ca3af;
+}
+
+/* 修复高级规则编辑器的布局问题 */
+:deep(.el-form-item__content) {
+  display: block !important;
+  width: 100% !important;
+}
+
+/* 确保高级规则编辑器容器撑满宽度 */
+:deep(.advanced-rule-editor) {
+  width: 100% !important;
+  max-width: 100% !important;
 }
 </style>

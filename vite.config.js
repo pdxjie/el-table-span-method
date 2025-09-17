@@ -9,16 +9,10 @@ export default defineConfig({
       '@': resolve(__dirname, 'src')
     }
   },
-  optimizeDeps: {
-    include: ['monaco-editor']
+  define: {
+    global: 'globalThis',
   },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          monaco: ['monaco-editor']
-        }
-      }
-    }
+  optimizeDeps: {
+    include: ['monaco-editor/esm/vs/editor/editor.worker.js']
   }
 })

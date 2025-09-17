@@ -2,6 +2,7 @@
  * El-Table Span Method 核心工具函数
  * 用于生成表格合并逻辑
  */
+import { advancedRuleEngine } from './advancedRuleEngine.js'
 
 /**
  * 生成 span-method 函数
@@ -185,20 +186,30 @@ function calculateMixedSpan(tableData, config, params) {
  * 判断两个值是否应该合并
  * @param {any} value1 - 值1
  * @param {any} value2 - 值2
- * @param {string} condition - 合并条件 'same' | 'custom'
+ * @param {string} condition - 合并条件 'same' | 'custom' | 'advanced'
  * @param {string} customRule - 自定义规则代码
+ * @param {Object} options - 额外选项
  * @returns {boolean} 是否应该合并
  */
-function shouldMerge(value1, value2, condition = 'same', customRule = '') {
+function shouldMerge(value1, value2, condition = 'same', customRule = '', options = {}) {
   if (condition === 'same') {
     return value1 === value2
   } else if (condition === 'custom' && customRule) {
+    // 兼容原有的简单规则
     try {
-      // 创建自定义规则函数
       const mergeFunction = new Function('value1', 'value2', `return ${customRule}`)
       return mergeFunction(value1, value2)
     } catch (error) {
       console.error('自定义合并规则执行错误:', error)
+      return value1 === value2
+    }
+  } else if (condition === 'advanced' && customRule) {
+    // 使用高级规则引擎
+    try {
+      const result = advancedRuleEngine.executeRule(customRule, value1, value2, options)
+      return result.success ? result.result : value1 === value2
+    } catch (error) {
+      console.error('高级规则引擎执行错误:', error)
       return value1 === value2
     }
   }
