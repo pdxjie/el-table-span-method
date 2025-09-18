@@ -117,6 +117,68 @@
         </el-tabs>
       </section>
     </main>
+
+    <!-- GitHub推广浮动卡片 -->
+    <div class="github-promotion-float" :class="{ 'show': showGithubPromo }">
+      <div class="github-card">
+        <!-- 关闭按钮 -->
+        <button class="close-btn" @click="hideGithubPromo">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+        </button>
+        
+        <!-- 卡片内容 -->
+        <div class="card-content">
+          <!-- GitHub标志动画 -->
+          <div class="github-logo">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0C5.374 0 0 5.373 0 12 0 17.302 3.438 21.8 8.207 23.387c.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+            </svg>
+          </div>
+          
+          <!-- 标题 -->
+          <h3 class="card-title">喜欢这个项目？</h3>
+          <p class="card-subtitle">支持开源，给个 Star ⭐</p>
+          
+          <!-- 统计信息 -->
+          <div class="stats">
+            <div class="stat-item">
+              <div class="stat-number">{{ starsCount || '999+' }}</div>
+              <div class="stat-label">Stars</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <div class="stat-number">{{ forksCount || '100+' }}</div>
+              <div class="stat-label">Forks</div>
+            </div>
+          </div>
+          
+          <!-- 操作按钮 -->
+          <div class="card-actions">
+            <a href="https://github.com/pdxjie/el-table-span-method" target="_blank" class="action-btn primary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+              Star 项目
+            </a>
+            <a href="https://github.com/pdxjie" target="_blank" class="action-btn secondary">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+              关注作者
+            </a>
+          </div>
+        </div>
+        
+        <!-- 装饰性背景 -->
+        <div class="bg-decoration">
+          <div class="decoration-circle circle-1"></div>
+          <div class="decoration-circle circle-2"></div>
+          <div class="decoration-circle circle-3"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -151,7 +213,22 @@ export default {
     })
     const activeTab = ref('preview')
     const isVerticalLayout = ref(false)
-    const currentLibrary = ref('element-plus') // 添加当前UI库状态
+    const currentLibrary = ref('element-plus')
+    
+    // GitHub推广相关状态
+    const showGithubPromo = ref(false)
+    const starsCount = ref('')
+    const forksCount = ref('')
+
+    // 延迟显示GitHub推广卡片
+    setTimeout(() => {
+      showGithubPromo.value = true
+    }, 3000)
+
+    // 隐藏推广卡片（仅当前会话有效）
+    const hideGithubPromo = () => {
+      showGithubPromo.value = false
+    } // 添加当前UI库状态
 
     const handleDataChange = (data) => {
       tableData.value = data
@@ -354,11 +431,15 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
       activeTab,
       isVerticalLayout,
       currentLibrary,
+      showGithubPromo,
+      starsCount,
+      forksCount,
       handleDataChange,
       handleConfigChange,
       handleLibraryChange,
       handleSpanMethod,
-      toggleLayout
+      toggleLayout,
+      hideGithubPromo
     }
   }
 }
@@ -399,6 +480,275 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* GitHub推广浮动卡片样式 */
+.github-promotion-float {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 1000;
+  transform: translateY(100px) scale(0.8);
+  opacity: 0;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+
+.github-promotion-float.show {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.github-card {
+  width: 320px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  box-shadow: 
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04),
+    0 0 0 1px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.github-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #3b82f6, #10b981, #f59e0b, #ef4444);
+  opacity: 0.8;
+}
+
+.close-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.close-btn:hover {
+  background: rgba(0, 0, 0, 0.1);
+  color: #374151;
+  transform: scale(1.1);
+}
+
+.card-content {
+  position: relative;
+  z-index: 5;
+}
+
+.github-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #24292e 0%, #40484f 100%);
+  border-radius: 12px;
+  margin: 0 auto 16px;
+  color: white;
+  animation: float 3s ease-in-out infinite;
+}
+
+.github-logo svg {
+  animation: rotate 8s linear infinite;
+}
+
+.card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  text-align: center;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.card-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+  text-align: center;
+  margin: 0 0 20px 0;
+  line-height: 1.4;
+}
+
+.stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 20px 0;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.stat-item {
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.stat-divider {
+  width: 1px;
+  height: 32px;
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.card-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  box-shadow: 0 4px 14px 0 rgba(59, 130, 246, 0.3);
+}
+
+.action-btn.primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px 0 rgba(59, 130, 246, 0.4);
+}
+
+.action-btn.secondary {
+  background: white;
+  color: #374151;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.action-btn.secondary:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
+}
+
+.action-btn svg {
+  transition: transform 0.2s ease;
+}
+
+.action-btn:hover svg {
+  transform: scale(1.1);
+}
+
+/* 装饰性背景 */
+.bg-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.decoration-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.1));
+  animation: float-decoration 6s ease-in-out infinite;
+}
+
+.circle-1 {
+  width: 60px;
+  height: 60px;
+  top: -30px;
+  right: -30px;
+  animation-delay: 0s;
+}
+
+.circle-2 {
+  width: 40px;
+  height: 40px;
+  bottom: -20px;
+  left: -20px;
+  animation-delay: 2s;
+}
+
+.circle-3 {
+  width: 80px;
+  height: 80px;
+  top: 50%;
+  right: -40px;
+  animation-delay: 4s;
+}
+
+/* 动画效果 */
+@keyframes float {
+  0%, 100% { 
+    transform: translateY(0);
+  }
+  50% { 
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes rotate {
+  from { 
+    transform: rotate(0deg);
+  }
+  to { 
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float-decoration {
+  0%, 100% { 
+    transform: translate(0, 0) scale(1);
+    opacity: 0.3;
+  }
+  50% { 
+    transform: translate(-10px, -10px) scale(1.1);
+    opacity: 0.6;
+  }
 }
 
 .brand-icon {
@@ -633,6 +983,16 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   .header-container {
     padding: 12px 20px;
   }
+  
+  .github-promotion-float {
+    bottom: 20px;
+    right: 20px;
+  }
+  
+  .github-card {
+    width: 280px;
+    padding: 20px;
+  }
 
   .app-main {
     padding: 20px;
@@ -670,6 +1030,29 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
 
   .brand-text .tagline {
     display: none;
+  }
+  
+  .github-promotion-float {
+    bottom: 16px;
+    right: 16px;
+  }
+  
+  .github-card {
+    width: 260px;
+    padding: 18px;
+  }
+  
+  .card-title {
+    font-size: 16px;
+  }
+  
+  .stats {
+    padding: 12px;
+  }
+  
+  .action-btn {
+    padding: 10px 12px;
+    font-size: 13px;
   }
 
   .app-main {
@@ -719,6 +1102,46 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
     padding: 8px 12px;
   }
 
+  .github-promotion-float {
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+  }
+
+  .github-card {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .card-title {
+    font-size: 15px;
+  }
+
+  .card-subtitle {
+    font-size: 13px;
+  }
+
+  .stats {
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px 12px;
+  }
+
+  .stat-divider {
+    width: 60%;
+    height: 1px;
+  }
+
+  .card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .action-btn {
+    padding: 12px;
+    font-size: 14px;
+  }
+
   .app-header {
     height: auto;
     min-height: 80px;
@@ -727,10 +1150,6 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   .app-main {
     height: calc(100vh - 80px);
     margin-top: 80px;
-  }
-
-  .header-actions {
-    align-self: stretch;
   }
 
   .tab-content-wrapper {
