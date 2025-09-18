@@ -351,14 +351,13 @@ export default {
 
 <style scoped>
 .ui-library-selector {
-  margin-bottom: 20px;
+  /* 移除margin，因为现在是固定头部 */
 }
 
 /* 主选择器 */
 .selector-main {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  /* 移除边框和圆角，因为父容器已经有了 */
   overflow: hidden;
 }
 
@@ -366,8 +365,8 @@ export default {
 .selector-header {
   display: flex;
   justify-content: center;
-  padding: 12px 16px;
-  background: #fafbfc;
+  padding: 16px;
+  background: #ffffff;
   border-bottom: 1px solid #f0f0f0;
 }
 

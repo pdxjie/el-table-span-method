@@ -19,17 +19,21 @@
     <main class="app-main" :class="{ 'vertical-layout': isVerticalLayout }">
       <!-- 配置侧边栏 -->
       <aside class="config-sidebar">
-        <!-- UI库选择器 -->
-        <UILibrarySelector
-          :current-library="currentLibrary"
-          @library-change="handleLibraryChange"
-        />
+        <!-- UI库选择器 - 固定在顶部 -->
+        <div class="sidebar-header">
+          <UILibrarySelector
+            :current-library="currentLibrary"
+            @library-change="handleLibraryChange"
+          />
+        </div>
         
-        <!-- 配置面板 -->
-        <ConfigPanel
-          @data-change="handleDataChange"
-          @config-change="handleConfigChange"
-        />
+        <!-- 配置面板 - 可滚动内容 -->
+        <div class="sidebar-content">
+          <ConfigPanel
+            @data-change="handleDataChange"
+            @config-change="handleConfigChange"
+          />
+        </div>
       </aside>
 
       <!-- 内容面板 -->
@@ -289,17 +293,35 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  overflow-y: auto;
   height: calc(100vh - 130px);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
-  gap: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .vertical-layout .config-sidebar {
   width: 100%;
   height: auto;
+}
+
+.vertical-layout .sidebar-header {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.vertical-layout .sidebar-content {
+  overflow-y: visible;
 }
 
 /* 内容面板 */
@@ -447,6 +469,10 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
     height: calc(100vh - 108px);
   }
 
+  .sidebar-content {
+    overflow-y: auto;
+  }
+
   .content-panel {
     height: calc(100vh - 108px);
   }
@@ -480,6 +506,11 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   .config-sidebar {
     width: 100%;
     height: auto;
+    overflow: visible;
+  }
+
+  .sidebar-content {
+    overflow-y: visible;
   }
 
   .content-panel {
