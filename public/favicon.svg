@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- 背景 -->
+  <rect x="0" y="0" width="16" height="16" rx="3" fill="url(#bg)"/>
+  
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3b82f6"/>
+      <stop offset="100%" style="stop-color:#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- 简化的表格 -->
+  <rect x="3" y="4" width="10" height="8" rx="1" fill="none" stroke="white" stroke-width="1"/>
+  <line x1="3" y1="7" x2="13" y2="7" stroke="white" stroke-width="0.5"/>
+  <line x1="3" y1="9" x2="13" y2="9" stroke="white" stroke-width="0.5"/>
+  <line x1="7" y1="4" x2="7" y2="12" stroke="white" stroke-width="0.5"/>
+  <line x1="10" y1="4" x2="10" y2="12" stroke="white" stroke-width="0.5"/>
+  
+  <!-- 魔法星星 -->
+  <path d="M8 1 L8.3 2 L9 2.2 L8.3 2.4 L8 3 L7.7 2.4 L7 2.2 L7.7 2 Z" fill="#fbbf24"/>
+  
+  <!-- 合并指示 -->
+  <rect x="4" y="5" width="2" height="0.8" rx="0.4" fill="#10b981"/>
+  <rect x="10" y="5" width="2" height="0.8" rx="0.4" fill="#10b981"/>
+  
+  <!-- 连接线 -->
+  <path d="M5 5.4 Q8 3.5 11 5.4" stroke="#fbbf24" stroke-width="1" fill="none" stroke-linecap="round"/>
+</svg>
