@@ -152,20 +152,84 @@ export default {
     })
 
     const generateCodeString = (config) => {
-      const spanMethodCode = `
+      if (config.mergeType === 'column') {
+        // 列合并代码生成 - 多层表头结构
+        return `
+// 列合并实现：使用多层表头结构
+// 表头列配置
+const columnGroups = {
+  '${config.mergeColumns.join(',')}': '${getMergedGroupLabel(config.mergeColumns)}'
+}
+
+// Element Plus 表格列配置
+const tableColumns = [
+  // 合并列组
+  {
+    label: columnGroups['${config.mergeColumns.join(',')}'],
+    align: 'center',
+    children: [
+      ${config.mergeColumns.map(col => `{
+        prop: '${col}',
+        label: '${col}',
+        minWidth: 120
+      }`).join(',\n      ')}
+    ]
+  },
+  // 其他列
+  ${getOtherColumns(config.mergeColumns).map(col => `{
+    prop: '${col}',
+    label: '${col}',
+    minWidth: 120
+  }`).join(',\n  ')}
+]
+
+// 在模板中使用：
+// <el-table :data="tableData" border>
+//   <el-table-column v-for="col in tableColumns" v-bind="col" :key="col.prop || col.label">
+//     <el-table-column v-if="col.children" v-for="child in col.children" v-bind="child" :key="child.prop"/>
+//   </el-table-column>
+// </el-table>`
+      } else if (config.mergeType === 'mixed') {
+        // 混合合并代码
+        return `
+// 混合合并实现：表头列合并 + 数据行合并
+// 表头列配置（同列合并）
+const columnGroups = {
+  '${config.mergeColumns.join(',')}': '${getMergedGroupLabel(config.mergeColumns)}'
+}
+
+const tableColumns = [
+  // 合并列组
+  {
+    label: columnGroups['${config.mergeColumns.join(',')}'],
+    align: 'center',
+    children: [
+      ${config.mergeColumns.map(col => `{
+        prop: '${col}',
+        label: '${col}',
+        minWidth: 120
+      }`).join(',\n      ')}
+    ]
+  },
+  // 其他列
+  ${getOtherColumns(config.mergeColumns).map(col => `{
+    prop: '${col}',
+    label: '${col}',
+    minWidth: 120
+  }`).join(',\n  ')}
+]
+
+// 行合并方法
 const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
-  // 根据配置生成的 span-method 代码
-  const mergeColumns = ${JSON.stringify(config.mergeColumns)}
-  const mergeType = '${config.mergeType}'
+  // 对非列合并组的第一列进行行合并（如department）
+  const rowMergeField = 'department' // 根据实际数据调整
   
-  if (mergeType === 'row' && mergeColumns.includes(column.property)) {
-    // 行合并逻辑
+  if (column.property === 'name' && row[rowMergeField]) {
     let rowspan = 1
-    let colspan = 1
     
-    // 计算行合并数量
+    // 向下查找相同部门的行
     for (let i = rowIndex + 1; i < tableData.length; i++) {
-      if (tableData[i][column.property] === row[column.property]) {
+      if (tableData[i][rowMergeField] === row[rowMergeField]) {
         rowspan++
       } else {
         break
@@ -174,20 +238,77 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
     
     // 检查是否为合并区域的第一行
     for (let i = rowIndex - 1; i >= 0; i--) {
-      if (tableData[i][column.property] === row[column.property]) {
+      if (tableData[i][rowMergeField] === row[rowMergeField]) {
         return { rowspan: 0, colspan: 0 }
       } else {
         break
       }
     }
     
-    return { rowspan, colspan }
+    return { rowspan, colspan: 1 }
   }
   
   return { rowspan: 1, colspan: 1 }
 }`
+      } else {
+        // 行合并代码（原有逻辑）
+        return `
+// 行合并实现
+const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
+  const mergeColumns = ${JSON.stringify(config.mergeColumns)}
+  
+  if (!mergeColumns.includes(column.property)) {
+    return { rowspan: 1, colspan: 1 }
+  }
+  
+  let rowspan = 1
+  const currentValue = row[column.property]
+  
+  // 向下计算行合并数量
+  for (let i = rowIndex + 1; i < tableData.length; i++) {
+    if (tableData[i][column.property] === currentValue) {
+      rowspan++
+    } else {
+      break
+    }
+  }
+  
+  // 检查是否为合并区域的第一行
+  for (let i = rowIndex - 1; i >= 0; i--) {
+    if (tableData[i][column.property] === currentValue) {
+      return { rowspan: 0, colspan: 0 }
+    } else {
+      break
+    }
+  }
+  
+  return { rowspan, colspan: 1 }
+}`
+      }
+    }
+
+    // 获取合并组标签的辅助函数
+    const getMergedGroupLabel = (mergeColumns) => {
+      const columnGroups = {
+        'region,province,city': '地理信息',
+        'phone,email': '联系方式',
+        'category,type': '分类信息',
+        'first_name,last_name': '姓名',
+        'start_date,end_date': '时间范围',
+        'width,height': '尺寸',
+        'min,max': '范围',
+        'address,zipcode': '地址信息'
+      }
       
-      return spanMethodCode
+      const key = mergeColumns.join(',')
+      return columnGroups[key] || `${mergeColumns[0]}等信息`
+    }
+
+    // 获取其他列的辅助函数
+    const getOtherColumns = (mergeColumns) => {
+      // 这里需要根据实际的表格字段来确定
+      const allFields = ['name', 'department', 'position', 'level'] // 示例字段
+      return allFields.filter(field => !mergeColumns.includes(field))
     }
 
     return {

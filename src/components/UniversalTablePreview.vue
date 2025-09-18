@@ -40,20 +40,64 @@
           :style="{ width: tableScrollWidth, minWidth: tableScrollWidth }"
           class="preview-table"
         >
-          <el-table-column
-            v-for="(field, index) in tableFields"
-            :key="field"
-            :prop="field"
-            :label="field"
-            :min-width="getColumnMinWidth(field)"
-            show-overflow-tooltip
-          >
-            <template #default="scope">
-              <div class="cell-content">
-                {{ scope.row[field] }}
-              </div>
-            </template>
-          </el-table-column>
+          <!-- 动态生成列结构 -->
+          <template v-if="spanConfig.mergeType === 'column' || spanConfig.mergeType === 'mixed'">
+            <!-- 合并列组 -->
+            <el-table-column
+              v-if="mergedColumnGroup.length > 0"
+              :label="getMergedColumnGroupLabel()"
+              align="center"
+            >
+              <el-table-column
+                v-for="field in mergedColumnGroup"
+                :key="field"
+                :prop="field"
+                :label="field"
+                :min-width="getColumnMinWidth(field)"
+                show-overflow-tooltip
+              >
+                <template #default="scope">
+                  <div class="cell-content">
+                    {{ scope.row[field] }}
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            
+            <!-- 非合并列 -->
+            <el-table-column
+              v-for="field in nonMergedColumns"
+              :key="field"
+              :prop="field"
+              :label="field"
+              :min-width="getColumnMinWidth(field)"
+              show-overflow-tooltip
+            >
+              <template #default="scope">
+                <div class="cell-content">
+                  {{ scope.row[field] }}
+                </div>
+              </template>
+            </el-table-column>
+          </template>
+          
+          <!-- 行合并或正常表格 -->
+          <template v-else>
+            <el-table-column
+              v-for="(field, index) in tableFields"
+              :key="field"
+              :prop="field"
+              :label="field"
+              :min-width="getColumnMinWidth(field)"
+              show-overflow-tooltip
+            >
+              <template #default="scope">
+                <div class="cell-content">
+                  {{ scope.row[field] }}
+                </div>
+              </template>
+            </el-table-column>
+          </template>
         </el-table>
 
         <!-- 其他UI库的表格组件 - 仅在对应库加载后渲染 -->
@@ -72,25 +116,83 @@
         <!-- Vuetify 特殊处理 - 使用自定义表格结构支持完整合并 -->
         <div v-else-if="currentLibrary === 'vuetify'" class="vuetify-table-wrapper">
           <table class="vuetify-custom-table" :class="{ 'bordered': spanConfig.showBorder, 'striped': spanConfig.stripe }">
+            <!-- 多层表头 -->
             <thead>
-              <tr>
-                <th v-for="field in tableFields" :key="field" class="vuetify-header">
-                  {{ field }}
-                </th>
-              </tr>
+              <!-- 列合并或混合合并的表头 -->
+              <template v-if="spanConfig.mergeType === 'column' || spanConfig.mergeType === 'mixed'">
+                <!-- 第一层表头：合并列组 -->
+                <tr class="vuetify-header-row">
+                  <th 
+                    v-if="mergedColumnGroup.length > 0"
+                    :colspan="mergedColumnGroup.length" 
+                    class="vuetify-header merged-header"
+                  >
+                    {{ getMergedColumnGroupLabel() }}
+                  </th>
+                  <th 
+                    v-for="field in nonMergedColumns" 
+                    :key="field" 
+                    :rowspan="2"
+                    class="vuetify-header normal-header"
+                  >
+                    {{ field }}
+                  </th>
+                </tr>
+                <!-- 第二层表头：合并列组的子列 -->
+                <tr class="vuetify-header-row">
+                  <th 
+                    v-for="field in mergedColumnGroup" 
+                    :key="field" 
+                    class="vuetify-header sub-header"
+                  >
+                    {{ field }}
+                  </th>
+                </tr>
+              </template>
+              
+              <!-- 行合并的表头 -->
+              <template v-else>
+                <tr>
+                  <th v-for="field in tableFields" :key="field" class="vuetify-header">
+                    {{ field }}
+                  </th>
+                </tr>
+              </template>
             </thead>
+            
             <tbody>
               <tr v-for="(row, rowIndex) in processedTableData" :key="rowIndex" 
                   :class="{ 'striped-row': spanConfig.stripe && rowIndex % 2 === 1 }">
-                <td v-for="(field, colIndex) in tableFields" :key="field" 
-                    :class="getVuetifyCustomCellClass(row, field, rowIndex, colIndex)"
-                    :style="getVuetifyCustomCellStyle(row, field, rowIndex, colIndex)"
-                    :rowspan="getVuetifyCustomRowspan(row, field)"
-                    :colspan="getVuetifyCustomColspan(row, field)"
-                    v-show="shouldShowVuetifyCustomCell(row, field)"
-                    class="vuetify-cell">
-                  {{ row[field] }}
-                </td>
+                <!-- 列合并或混合合并的数据行 -->
+                <template v-if="spanConfig.mergeType === 'column' || spanConfig.mergeType === 'mixed'">
+                  <!-- 合并列组的数据 -->
+                  <td v-for="(field, colIndex) in mergedColumnGroup" :key="field" 
+                      class="vuetify-cell merged-group-cell">
+                    {{ row[field] }}
+                  </td>
+                  <!-- 非合并列的数据 -->
+                  <td v-for="(field, colIndex) in nonMergedColumns" :key="field" 
+                      :class="getVuetifyMixedCellClass(row, field, rowIndex, colIndex)"
+                      :style="getVuetifyMixedCellStyle(row, field, rowIndex, colIndex)"
+                      :rowspan="getVuetifyMixedRowspan(row, field, rowIndex)"
+                      v-show="shouldShowVuetifyMixedCell(row, field, rowIndex)"
+                      class="vuetify-cell">
+                    {{ row[field] }}
+                  </td>
+                </template>
+                
+                <!-- 行合并的数据行（原有逻辑） -->
+                <template v-else>
+                  <td v-for="(field, colIndex) in tableFields" :key="field" 
+                      :class="getVuetifyCustomCellClass(row, field, rowIndex, colIndex)"
+                      :style="getVuetifyCustomCellStyle(row, field, rowIndex, colIndex)"
+                      :rowspan="getVuetifyCustomRowspan(row, field)"
+                      :colspan="getVuetifyCustomColspan(row, field)"
+                      v-show="shouldShowVuetifyCustomCell(row, field)"
+                      class="vuetify-cell">
+                    {{ row[field] }}
+                  </td>
+                </template>
               </tr>
             </tbody>
           </table>
@@ -190,6 +292,43 @@ export default {
       if (props.tableData.length === 0) return []
       return Object.keys(props.tableData[0])
     })
+
+    // 合并列组和非合并列的计算属性
+    const mergedColumnGroup = computed(() => {
+      if (props.spanConfig.mergeType === 'column' || props.spanConfig.mergeType === 'mixed') {
+        return props.spanConfig.mergeColumns || []
+      }
+      return []
+    })
+
+    const nonMergedColumns = computed(() => {
+      if (props.spanConfig.mergeType === 'column' || props.spanConfig.mergeType === 'mixed') {
+        const mergeColumns = props.spanConfig.mergeColumns || []
+        return tableFields.value.filter(field => !mergeColumns.includes(field))
+      }
+      return tableFields.value
+    })
+
+    // 获取合并列组的标签
+    const getMergedColumnGroupLabel = () => {
+      const mergeColumns = props.spanConfig.mergeColumns || []
+      if (mergeColumns.length === 0) return ''
+      
+      // 根据列名推断分组名称
+      const columnGroups = {
+        'region,province,city': '地理信息',
+        'phone,email': '联系方式',
+        'category,type': '分类信息',
+        'first_name,last_name': '姓名',
+        'start_date,end_date': '时间范围',
+        'width,height': '尺寸',
+        'min,max': '范围',
+        'address,zipcode': '地址信息'
+      }
+      
+      const key = mergeColumns.join(',')
+      return columnGroups[key] || `${mergeColumns[0]}等信息`
+    }
 
     const currentLibraryName = computed(() => {
       const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
@@ -641,44 +780,146 @@ export default {
 
     // Ant Design Vue 合并计算函数 - 按照官方文档实现
     const calculateAntdCellSpan = (tableData, rowIndex, field, spanConfig) => {
-      const { mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      const { mergeType = 'row', mergeColumns = [], mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
       const currentValue = tableData[rowIndex][field]
       
       if (mergeType === 'row') {
-        // 行合并逻辑
-        let rowSpan = 1
-        let colSpan = 1
-        
-        // 向下查找相同值
-        const maxIndex = endRow !== undefined ? Math.min(endRow, tableData.length - 1) : tableData.length - 1
-        for (let i = rowIndex + 1; i <= maxIndex; i++) {
-          if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
-            rowSpan++
-          } else {
-            break
-          }
-        }
-        
-        // 检查是否为合并区域的第一行
-        for (let i = rowIndex - 1; i >= startRow; i--) {
-          if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
-            // 不是第一行，隐藏这个单元格
-            return { rowSpan: 0, colSpan: 0 }
-          } else {
-            break
-          }
-        }
-        
-        return { rowSpan, colSpan }
+        return calculateAntdRowSpan(tableData, rowIndex, field, spanConfig)
       } else if (mergeType === 'column') {
-        // 列合并逻辑 - Ant Design Vue 支持有限
-        return { rowSpan: 1, colSpan: 1 }
+        return calculateAntdColumnSpan(tableData, rowIndex, field, spanConfig)
       } else if (mergeType === 'mixed') {
-        // 混合合并 - 降级为行合并
-        return calculateAntdCellSpan(tableData, rowIndex, field, { ...spanConfig, mergeType: 'row' })
+        return calculateAntdMixedSpan(tableData, rowIndex, field, spanConfig)
       }
       
       return { rowSpan: 1, colSpan: 1 }
+    }
+    
+    const calculateAntdRowSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      let rowSpan = 1
+      
+      // 向下查找相同值
+      const maxIndex = endRow !== undefined ? Math.min(endRow, tableData.length - 1) : tableData.length - 1
+      for (let i = rowIndex + 1; i <= maxIndex; i++) {
+        if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          // 不是第一行，隐藏这个单元格
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowSpan, colSpan: 1 }
+    }
+    
+    const calculateAntdColumnSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeColumns = [], mergeCondition = 'same', customRule } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      const allFields = Object.keys(tableData[0])
+      const currentFieldIndex = allFields.indexOf(field)
+      let colSpan = 1
+      
+      // 向右查找相邻的相同值列
+      for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!mergeColumns.includes(nextField)) break
+        
+        if (shouldMergeAntdValues(tableData[rowIndex][nextField], currentValue, mergeCondition, customRule)) {
+          colSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否是合并区域的第一列
+      for (let i = currentFieldIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!mergeColumns.includes(prevField)) break
+        
+        if (shouldMergeAntdValues(tableData[rowIndex][prevField], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowSpan: 1, colSpan }
+    }
+    
+    const calculateAntdMixedSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeColumns = [], mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      const allFields = Object.keys(tableData[0])
+      const currentFieldIndex = allFields.indexOf(field)
+      const actualEndRow = endRow !== undefined ? endRow : tableData.length - 1
+      
+      let rowSpan = 1
+      let colSpan = 1
+      
+      // 1. 先计算行合并
+      const maxRowIndex = Math.min(actualEndRow, tableData.length - 1)
+      for (let i = rowIndex + 1; i <= maxRowIndex; i++) {
+        if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 2. 再计算列合并
+      for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!mergeColumns.includes(nextField)) break
+        
+        // 检查这一列的所有相关行是否都有相同值
+        let canMergeColumn = true
+        for (let row = rowIndex; row < rowIndex + rowSpan; row++) {
+          if (!shouldMergeAntdValues(tableData[row][nextField], currentValue, mergeCondition, customRule)) {
+            canMergeColumn = false
+            break
+          }
+        }
+        
+        if (canMergeColumn) {
+          colSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 3. 检查是否应该隐藏（不是合并区域的左上角）
+      // 检查行方向
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      // 检查列方向
+      for (let i = currentFieldIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!mergeColumns.includes(prevField)) break
+        
+        if (shouldMergeAntdValues(tableData[rowIndex][prevField], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowSpan, colSpan }
     }
     
     // Ant Design Vue 合并条件判断
@@ -727,21 +968,60 @@ export default {
       if (endRow !== undefined && rowIndex > endRow) {
         return { rowspan: 1, colspan: 1 }
       }
-      
-      // 检查是否为要合并的列
-      if (!mergeColumns.includes(column.property)) {
-        return { rowspan: 1, colspan: 1 }
-      }
 
       if (mergeType === 'row') {
+        // 检查是否为要合并的列
+        if (!mergeColumns.includes(column.property)) {
+          return { rowspan: 1, colspan: 1 }
+        }
         return calculateRowSpan({ row, column, rowIndex, columnIndex })
       } else if (mergeType === 'column') {
-        return calculateColumnSpan({ row, column, rowIndex, columnIndex })
+        // 列合并已通过表头结构实现，数据行不需要特殊处理
+        return { rowspan: 1, colspan: 1 }
       } else if (mergeType === 'mixed') {
-        return calculateMixedSpan({ row, column, rowIndex, columnIndex })
+        // 混合合并：表头列合并 + 数据行合并
+        // 对于非列合并组中的列，进行行合并
+        const isInColumnGroup = mergeColumns.includes(column.property)
+        if (!isInColumnGroup) {
+          // 找一个合适的行合并依据列（比如第一个非合并列组的列）
+          const rowMergeColumns = tableFields.value.filter(field => !mergeColumns.includes(field))
+          if (rowMergeColumns.length > 0 && column.property === rowMergeColumns[0]) {
+            return calculateMixedRowSpan({ row, column, rowIndex, columnIndex })
+          }
+        }
+        return { rowspan: 1, colspan: 1 }
       }
       
       return { rowspan: 1, colspan: 1 }
+    }
+
+    // 混合合并的行合并计算（基于部门等字段进行行合并）
+    const calculateMixedRowSpan = ({ row, column, rowIndex, columnIndex }) => {
+      // 对于混合合并，我们基于 department 等字段进行行合并
+      const departmentValue = row['department']
+      if (!departmentValue) return { rowspan: 1, colspan: 1 }
+      
+      let rowspan = 1
+      
+      // 向下查找相同部门的行
+      for (let i = rowIndex + 1; i < props.tableData.length; i++) {
+        if (shouldMerge(props.tableData[i]['department'], departmentValue)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMerge(props.tableData[i]['department'], departmentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowspan, colspan: 1 }
     }
 
     const calculateRowSpan = ({ row, column, rowIndex, columnIndex }) => {
@@ -771,13 +1051,139 @@ export default {
     }
 
     const calculateColumnSpan = ({ row, column, rowIndex, columnIndex }) => {
-      // 列合并逻辑
-      return { rowspan: 1, colspan: 1 }
+      const { mergeColumns } = props.spanConfig
+      const currentValue = row[column.property]
+      let colspan = 1
+      let rowspan = 1
+      
+      // 检查当前列是否在合并列列表中
+      if (!mergeColumns.includes(column.property)) {
+        return { rowspan: 1, colspan: 1 }
+      }
+      
+      // 获取所有列的顺序
+      const allColumns = tableFields.value
+      const currentColIndex = allColumns.indexOf(column.property)
+      
+      // 向右查找相邻的相同值列
+      for (let i = currentColIndex + 1; i < allColumns.length; i++) {
+        const nextColumn = allColumns[i]
+        
+        // 只检查在合并列列表中的列
+        if (!mergeColumns.includes(nextColumn)) break
+        
+        if (shouldMerge(row[nextColumn], currentValue)) {
+          colspan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否是合并区域的第一列（避免重复渲染）
+      for (let i = currentColIndex - 1; i >= 0; i--) {
+        const prevColumn = allColumns[i]
+        
+        // 只检查在合并列列表中的列
+        if (!mergeColumns.includes(prevColumn)) break
+        
+        if (shouldMerge(row[prevColumn], currentValue)) {
+          // 不是第一列，隐藏此单元格
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowspan, colspan }
     }
 
     const calculateMixedSpan = ({ row, column, rowIndex, columnIndex }) => {
-      // 混合合并逻辑
-      return { rowspan: 1, colspan: 1 }
+      const { mergeColumns } = props.spanConfig
+      const currentValue = row[column.property]
+      let rowspan = 1
+      let colspan = 1
+      
+      // 检查当前列是否在合并列列表中
+      if (!mergeColumns.includes(column.property)) {
+        return { rowspan: 1, colspan: 1 }
+      }
+      
+      // 1. 先计算行合并
+      // 向下查找相同值的行
+      for (let i = rowIndex + 1; i < props.tableData.length; i++) {
+        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否为行合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+          // 不是第一行，但还需要检查列合并
+          break
+        } else {
+          break
+        }
+      }
+      
+      // 2. 再计算列合并（在同一行内）
+      const allColumns = tableFields.value
+      const currentColIndex = allColumns.indexOf(column.property)
+      
+      // 向右查找相邻的相同值列
+      for (let i = currentColIndex + 1; i < allColumns.length; i++) {
+        const nextColumn = allColumns[i]
+        
+        // 只检查在合并列列表中的列
+        if (!mergeColumns.includes(nextColumn)) break
+        
+        // 检查当前行的这一列是否也有相同值
+        if (shouldMerge(row[nextColumn], currentValue)) {
+          // 还需要检查涉及到的所有行的这一列是否都有相同值
+          let canMergeColumn = true
+          for (let r = rowIndex; r < rowIndex + rowspan; r++) {
+            if (!shouldMerge(props.tableData[r][nextColumn], currentValue)) {
+              canMergeColumn = false
+              break
+            }
+          }
+          
+          if (canMergeColumn) {
+            colspan++
+          } else {
+            break
+          }
+        } else {
+          break
+        }
+      }
+      
+      // 3. 检查是否是合并区域的左上角（避免重复渲染）
+      // 检查行方向
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      // 检查列方向
+      for (let i = currentColIndex - 1; i >= 0; i--) {
+        const prevColumn = allColumns[i]
+        
+        if (!mergeColumns.includes(prevColumn)) break
+        
+        if (shouldMerge(row[prevColumn], currentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowspan, colspan }
     }
 
     const shouldMerge = (value1, value2) => {
@@ -805,66 +1211,228 @@ export default {
       const fields = Object.keys(props.tableData[0])
       const { mergeColumns = [], mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
       
-      return fields.map(field => ({
-        title: field,
-        dataIndex: field,
-        key: field,
-        width: getColumnMinWidth(field),
-        // 按照官方文档，使用customCell函数
-        customCell: (record, index) => {
-          // 只对需要合并的列进行处理
-          if (!mergeColumns.includes(field)) {
-            return { rowSpan: 1, colSpan: 1 }
+      if (mergeType === 'column' || mergeType === 'mixed') {
+        // 列合并或混合合并：创建多层表头结构
+        const columns = []
+        
+        // 添加合并列组
+        if (mergeColumns.length > 0) {
+          columns.push({
+            title: getMergedColumnGroupLabel(),
+            align: 'center',
+            children: mergeColumns.map(field => ({
+              title: field,
+              dataIndex: field,
+              key: field,
+              width: getColumnMinWidth(field),
+              ellipsis: true
+            }))
+          })
+        }
+        
+        // 添加非合并列
+        const nonMergedFields = fields.filter(field => !mergeColumns.includes(field))
+        nonMergedFields.forEach(field => {
+          const column = {
+            title: field,
+            dataIndex: field,
+            key: field,
+            width: getColumnMinWidth(field),
+            ellipsis: true,
+            showSorterTooltip: false
           }
           
-          // 检查是否在合并范围内
-          if (index < startRow || (endRow !== undefined && index > endRow)) {
-            return { rowSpan: 1, colSpan: 1 }
+          // 混合合并：对非合并列组的第一列进行行合并
+          if (mergeType === 'mixed' && field === nonMergedFields[0]) {
+            column.customCell = (record, index) => {
+              return calculateAntdMixedRowSpan(props.tableData, index, field, props.spanConfig)
+            }
           }
           
-          return calculateAntdCellSpan(props.tableData, index, field, props.spanConfig)
-        },
-        ellipsis: true,
-        showSorterTooltip: false
-      }))
+          columns.push(column)
+        })
+        
+        return columns
+      } else {
+        // 行合并：原有逻辑
+        return fields.map(field => ({
+          title: field,
+          dataIndex: field,
+          key: field,
+          width: getColumnMinWidth(field),
+          // 按照官方文档，使用customCell函数
+          customCell: (record, index) => {
+            // 只对需要合并的列进行处理
+            if (!mergeColumns.includes(field)) {
+              return { rowSpan: 1, colSpan: 1 }
+            }
+            
+            // 检查是否在合并范围内
+            if (index < startRow || (endRow !== undefined && index > endRow)) {
+              return { rowSpan: 1, colSpan: 1 }
+            }
+            
+            return calculateAntdCellSpan(props.tableData, index, field, props.spanConfig)
+          },
+          ellipsis: true,
+          showSorterTooltip: false
+        }))
+      }
     })
+
+    // Ant Design Vue 混合合并的行合并计算
+    const calculateAntdMixedRowSpan = (tableData, rowIndex, field, spanConfig) => {
+      // 基于department字段进行行合并
+      const departmentValue = tableData[rowIndex]['department']
+      if (!departmentValue) return { rowSpan: 1, colSpan: 1 }
+      
+      let rowSpan = 1
+      
+      // 向下查找相同部门的行
+      for (let i = rowIndex + 1; i < tableData.length; i++) {
+        if (shouldMergeAntdValues(tableData[i]['department'], departmentValue, 'same', '')) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMergeAntdValues(tableData[i]['department'], departmentValue, 'same', '')) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowSpan, colSpan: 1 }
+    }
 
     // Naive UI 列配置 - 使用官方 rowSpan 和 colSpan 函数
     const naiveColumns = computed(() => {
       if (props.tableData.length === 0) return []
       
       const fields = Object.keys(props.tableData[0])
-      const { mergeColumns = [], mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
+      const { mergeColumns = [], mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
       
-      return fields.map(field => ({
-        title: field,
-        key: field,
-        // 使用 Naive UI 官方的 rowSpan 和 colSpan 函数
-        rowSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
-          const spanInfo = calculateNaiveUISpan(props.tableData, rowIndex, field, props.spanConfig)
-          return spanInfo.rowSpan
-        } : undefined,
-        colSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
-          const spanInfo = calculateNaiveUISpan(props.tableData, rowIndex, field, props.spanConfig)
-          return spanInfo.colSpan
-        } : undefined
-      }))
+      if (mergeType === 'column' || mergeType === 'mixed') {
+        // 列合并或混合合并：创建多层表头结构
+        const columns = []
+        
+        // 添加合并列组
+        if (mergeColumns.length > 0) {
+          columns.push({
+            title: getMergedColumnGroupLabel(),
+            key: 'mergedGroup',
+            align: 'center',
+            children: mergeColumns.map(field => ({
+              title: field,
+              key: field
+            }))
+          })
+        }
+        
+        // 添加非合并列
+        const nonMergedFields = fields.filter(field => !mergeColumns.includes(field))
+        nonMergedFields.forEach(field => {
+          const column = {
+            title: field,
+            key: field
+          }
+          
+          // 混合合并：对非合并列组的第一列进行行合并
+          if (mergeType === 'mixed' && field === nonMergedFields[0]) {
+            column.rowSpan = (rowData, rowIndex) => {
+              const spanInfo = calculateNaiveUIMixedRowSpan(props.tableData, rowIndex, field, props.spanConfig)
+              return spanInfo.rowSpan
+            }
+            column.colSpan = (rowData, rowIndex) => {
+              const spanInfo = calculateNaiveUIMixedRowSpan(props.tableData, rowIndex, field, props.spanConfig)
+              return spanInfo.colSpan
+            }
+          }
+          
+          columns.push(column)
+        })
+        
+        return columns
+      } else {
+        // 行合并：原有逻辑
+        return fields.map(field => ({
+          title: field,
+          key: field,
+          // 使用 Naive UI 官方的 rowSpan 和 colSpan 函数
+          rowSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
+            const spanInfo = calculateNaiveUISpan(props.tableData, rowIndex, field, props.spanConfig)
+            return spanInfo.rowSpan
+          } : undefined,
+          colSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
+            const spanInfo = calculateNaiveUISpan(props.tableData, rowIndex, field, props.spanConfig)
+            return spanInfo.colSpan
+          } : undefined
+        }))
+      }
     })
+
+    // Naive UI 混合合并的行合并计算
+    const calculateNaiveUIMixedRowSpan = (tableData, rowIndex, field, spanConfig) => {
+      // 基于department字段进行行合并
+      const departmentValue = tableData[rowIndex]['department']
+      if (!departmentValue) return { rowSpan: 1, colSpan: 1 }
+      
+      let rowSpan = 1
+      
+      // 向下查找相同部门的行
+      for (let i = rowIndex + 1; i < tableData.length; i++) {
+        if (shouldMergeNaiveUIValues(tableData[i]['department'], departmentValue, 'same', '')) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMergeNaiveUIValues(tableData[i]['department'], departmentValue, 'same', '')) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowSpan, colSpan: 1 }
+    }
     
     // Naive UI 合并计算函数 - 按照官方文档实现
     const calculateNaiveUISpan = (tableData, rowIndex, field, spanConfig) => {
-      const { mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig || {}
+      const { mergeType = 'row', mergeColumns = [], mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig || {}
       const currentValue = tableData[rowIndex][field]
-      let rowSpan = 1
-      let colSpan = 1
       
       // 检查是否在合并范围内
       const actualEndRow = endRow !== undefined ? endRow : tableData.length - 1
       if (rowIndex < startRow || rowIndex > actualEndRow) {
         return { rowSpan: 1, colSpan: 1 }
       }
-
+      
+      if (mergeType === 'row') {
+        return calculateNaiveUIRowSpan(tableData, rowIndex, field, spanConfig)
+      } else if (mergeType === 'column') {
+        return calculateNaiveUIColumnSpan(tableData, rowIndex, field, spanConfig)
+      } else if (mergeType === 'mixed') {
+        return calculateNaiveUIMixedSpan(tableData, rowIndex, field, spanConfig)
+      }
+      
+      return { rowSpan: 1, colSpan: 1 }
+    }
+    
+    const calculateNaiveUIRowSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      let rowSpan = 1
+      
       // 向下计算行合并 - 只在合并范围内
+      const actualEndRow = endRow !== undefined ? endRow : tableData.length - 1
       const maxIndex = Math.min(actualEndRow, tableData.length - 1)
       for (let i = rowIndex + 1; i <= maxIndex; i++) {
         if (shouldMergeNaiveUIValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
@@ -884,6 +1452,106 @@ export default {
         }
       }
 
+      return { rowSpan, colSpan: 1 }
+    }
+    
+    const calculateNaiveUIColumnSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeColumns = [], mergeCondition = 'same', customRule } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      const allFields = Object.keys(tableData[0])
+      const currentFieldIndex = allFields.indexOf(field)
+      let colSpan = 1
+      
+      // 向右查找相邻的相同值列
+      for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!mergeColumns.includes(nextField)) break
+        
+        if (shouldMergeNaiveUIValues(tableData[rowIndex][nextField], currentValue, mergeCondition, customRule)) {
+          colSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 检查是否是合并区域的第一列
+      for (let i = currentFieldIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!mergeColumns.includes(prevField)) break
+        
+        if (shouldMergeNaiveUIValues(tableData[rowIndex][prevField], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      return { rowSpan: 1, colSpan }
+    }
+    
+    const calculateNaiveUIMixedSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeColumns = [], mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      const allFields = Object.keys(tableData[0])
+      const currentFieldIndex = allFields.indexOf(field)
+      const actualEndRow = endRow !== undefined ? endRow : tableData.length - 1
+      
+      let rowSpan = 1
+      let colSpan = 1
+      
+      // 1. 先计算行合并
+      const maxRowIndex = Math.min(actualEndRow, tableData.length - 1)
+      for (let i = rowIndex + 1; i <= maxRowIndex; i++) {
+        if (shouldMergeNaiveUIValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 2. 再计算列合并
+      for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!mergeColumns.includes(nextField)) break
+        
+        // 检查这一列的所有相关行是否都有相同值
+        let canMergeColumn = true
+        for (let row = rowIndex; row < rowIndex + rowSpan; row++) {
+          if (!shouldMergeNaiveUIValues(tableData[row][nextField], currentValue, mergeCondition, customRule)) {
+            canMergeColumn = false
+            break
+          }
+        }
+        
+        if (canMergeColumn) {
+          colSpan++
+        } else {
+          break
+        }
+      }
+      
+      // 3. 检查是否应该隐藏（不是合并区域的左上角）
+      // 检查行方向
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (shouldMergeNaiveUIValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
+      // 检查列方向
+      for (let i = currentFieldIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!mergeColumns.includes(prevField)) break
+        
+        if (shouldMergeNaiveUIValues(tableData[rowIndex][prevField], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+      
       return { rowSpan, colSpan }
     }
     
@@ -1038,9 +1706,85 @@ export default {
       return ''
     }
 
-    const getVuetifyRowspan = (item, field) => {
-      const mergeInfo = item._merge && item._merge[field]
-      return mergeInfo && mergeInfo.shouldShow ? mergeInfo.rowspan : 1
+    // Vuetify 混合合并相关函数
+    const shouldShowVuetifyMixedCell = (row, field, rowIndex) => {
+      // 对于混合合并，非合并列组中的第一列需要检查行合并
+      const nonMergedFields = nonMergedColumns.value
+      if (nonMergedFields.length > 0 && field === nonMergedFields[0]) {
+        const departmentValue = row['department']
+        if (!departmentValue) return true
+        
+        // 检查是否为合并区域的第一行
+        for (let i = rowIndex - 1; i >= 0; i--) {
+          if (props.tableData[i]['department'] === departmentValue) {
+            return false // 不是第一行，隐藏
+          } else {
+            break
+          }
+        }
+      }
+      return true
+    }
+    
+    const getVuetifyMixedRowspan = (row, field, rowIndex) => {
+      // 对于混合合并，非合并列组中的第一列进行行合并
+      const nonMergedFields = nonMergedColumns.value
+      if (nonMergedFields.length > 0 && field === nonMergedFields[0]) {
+        const departmentValue = row['department']
+        if (!departmentValue) return 1
+        
+        let rowspan = 1
+        
+        // 向下查找相同部门的行
+        for (let i = rowIndex + 1; i < props.tableData.length; i++) {
+          if (props.tableData[i]['department'] === departmentValue) {
+            rowspan++
+          } else {
+            break
+          }
+        }
+        
+        return rowspan
+      }
+      return 1
+    }
+    
+    const getVuetifyMixedCellClass = (row, field, rowIndex, colIndex) => {
+      const classes = []
+      
+      // 对于混合合并，非合并列组中的第一列需要行合并样式
+      const nonMergedFields = nonMergedColumns.value
+      if (nonMergedFields.length > 0 && field === nonMergedFields[0]) {
+        const rowspan = getVuetifyMixedRowspan(row, field, rowIndex)
+        if (rowspan > 1) {
+          classes.push('merged-cell-custom', 'merge-type-mixed', `rowspan-${rowspan}`)
+        }
+      }
+      
+      return classes.join(' ')
+    }
+    
+    const getVuetifyMixedCellStyle = (row, field, rowIndex, colIndex) => {
+      const style = {}
+      
+      // 对于混合合并，非合并列组中的第一列需要行合并样式
+      const nonMergedFields = nonMergedColumns.value
+      if (nonMergedFields.length > 0 && field === nonMergedFields[0]) {
+        const rowspan = getVuetifyMixedRowspan(row, field, rowIndex)
+        if (rowspan > 1) {
+          style.verticalAlign = 'middle'
+          style.textAlign = 'center'
+          style.fontWeight = '500'
+          
+          // 计算合并单元格的高度
+          const rowHeight = 48 // Vuetify 默认行高
+          const borderHeight = rowspan - 1
+          const totalHeight = rowHeight * rowspan + borderHeight
+          style.height = `${totalHeight}px`
+        }
+      }
+      
+      return style
     }
 
     const getColumnMinWidth = (field) => {
@@ -1107,6 +1851,9 @@ export default {
 
     return {
       tableFields,
+      mergedColumnGroup,
+      nonMergedColumns,
+      getMergedColumnGroupLabel,
       currentLibraryName,
       processedTableData,
       isCurrentLibraryAvailable,
@@ -1118,19 +1865,33 @@ export default {
       getTableProps,
       getTableSlots,
       spanMethod,
+      calculateMixedRowSpan,
       antdColumns,
+      calculateAntdMixedRowSpan,
       naiveColumns,
+      calculateNaiveUIMixedRowSpan,
       calculateNaiveUISpan,
+      calculateNaiveUIRowSpan,
+      calculateNaiveUIColumnSpan,
+      calculateNaiveUIMixedSpan,
       shouldMergeNaiveUIValues,
+      calculateAntdCellSpan,
+      calculateAntdRowSpan,
+      calculateAntdColumnSpan,
+      calculateAntdMixedSpan,
+      shouldMergeAntdValues,
       vuetifyHeaders,
       shouldShowVuetifyCell,
       getVuetifyCellClass,
-      getVuetifyRowspan,
       shouldShowVuetifyCustomCell,
       getVuetifyCustomCellClass,
       getVuetifyCustomCellStyle,
       getVuetifyCustomRowspan,
       getVuetifyCustomColspan,
+      shouldShowVuetifyMixedCell,
+      getVuetifyMixedRowspan,
+      getVuetifyMixedCellClass,
+      getVuetifyMixedCellStyle,
       calculateVuetifySpan,
       calculateVuetifyRowSpan,
       calculateVuetifyColSpan,
@@ -1346,14 +2107,39 @@ export default {
   border: 1px solid #e0e0e0;
 }
 
+/* 多层表头样式 */
+.vuetify-header-row {
+  background: #f5f5f5;
+}
+
 .vuetify-header {
   background: #f5f5f5;
   color: #333;
   font-weight: 600;
   padding: 12px 16px;
-  text-align: left;
+  text-align: center;
   border-bottom: 1px solid #e0e0e0;
   border-right: 1px solid #e0e0e0;
+  position: relative;
+}
+
+.vuetify-header.merged-header {
+  background: #f5f5f5;
+  color: #444;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.vuetify-header.normal-header {
+  background: #f5f5f5;
+  vertical-align: middle;
+}
+
+.vuetify-header.sub-header {
+  background: #f0f0f0;
+  color: #555;
+  font-size: 13px;
+  border-top: none;
 }
 
 .vuetify-header:last-child {
@@ -1370,6 +2156,11 @@ export default {
   border-right: 1px solid #e0e0e0;
   transition: background-color 0.2s;
   position: relative;
+  vertical-align: top;
+}
+
+.vuetify-cell.merged-group-cell {
+  background: #f8f8f8;
 }
 
 .vuetify-cell:last-child {
@@ -1392,21 +2183,20 @@ export default {
 
 /* 行合并样式 */
 .merge-type-row .merged-cell-custom {
-  background: #f0f8ff !important;
-  border-left: 3px solid #3b82f6;
+  background: #f5f5f5 !important;
+  border-left: 2px solid #888;
 }
 
 /* 列合并样式 */
 .merge-type-column .merged-cell-custom {
-  background: #f0fff4 !important;
-  border-top: 3px solid #10b981;
+  background: #f5f5f5 !important;
+  border-top: 2px solid #888;
 }
 
 /* 混合合并样式 */
 .merge-type-mixed .merged-cell-custom {
-  background: #fefce8 !important;
-  border: 2px solid #f59e0b;
-  border-radius: 4px;
+  background: #f5f5f5 !important;
+  border: 1px solid #999;
 }
 
 /* 列合并特定样式 */
@@ -1433,16 +2223,16 @@ export default {
 }
 
 .striped-row .merged-cell-custom {
-  background-color: #f0f0f0 !important;
+  background-color: #f5f5f5 !important;
 }
 
 /* 悬停效果 */
 .vuetify-custom-table tbody tr:hover .vuetify-cell {
-  background-color: #f0f8ff;
+  background-color: #f5f5f5;
 }
 
 .vuetify-custom-table tbody tr:hover .merged-cell-custom {
-  background-color: #e6f3ff !important;
+  background-color: #eeeeee !important;
 }
 
 /* 响应式设计 */

@@ -53,6 +53,39 @@
             >
               使用示例数据
             </el-button>
+            
+            <!-- 测试数据卡片选择 -->
+            <div class="sample-cards">
+              <div class="sample-card" @click="loadSpecificSampleData('row')">
+                <div class="card-icon row-merge">
+                  <el-icon><Grid /></el-icon>
+                </div>
+                <div class="card-content">
+                  <h4>行合并示例</h4>
+                  <p>部门员工数据</p>
+                </div>
+              </div>
+              
+              <div class="sample-card" @click="loadSpecificSampleData('column')">
+                <div class="card-icon column-merge">
+                  <el-icon><Operation /></el-icon>
+                </div>
+                <div class="card-content">
+                  <h4>列合并示例</h4>
+                  <p>区域地理数据</p>
+                </div>
+              </div>
+              
+              <div class="sample-card" @click="loadSpecificSampleData('mixed')">
+                <div class="card-icon mixed-merge">
+                  <el-icon><Rank /></el-icon>
+                </div>
+                <div class="card-content">
+                  <h4>混合合并示例</h4>
+                  <p>产品销售数据</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -105,32 +138,99 @@
             <el-form :model="config" label-position="top" size="default">
 
               <el-form-item label="合并类型">
-                <el-radio-group v-model="config.mergeType" @change="handleConfigChange" class="merge-type-group">
+                <el-radio-group v-model="config.mergeType" @change="handleMergeTypeChange" class="merge-type-group">
                   <el-radio-button value="row">行合并</el-radio-button>
                   <el-radio-button value="column">列合并</el-radio-button>
                   <el-radio-button value="mixed">混合合并</el-radio-button>
                 </el-radio-group>
               </el-form-item>
 
-              <el-form-item label="选择合并列">
-                <el-select
-                  v-model="config.mergeColumns"
-                  multiple
-                  placeholder="请选择要合并的列"
-                  style="width: 100%"
-                  @change="handleConfigChange"
-                  collapse-tags
-                  collapse-tags-tooltip
-                  :disabled="tableInfo.fields.length === 0"
-                >
-                  <el-option
-                    v-for="field in tableInfo.fields"
-                    :key="field"
-                    :label="field"
-                    :value="field"
-                  />
-                </el-select>
-              </el-form-item>
+              <!-- 行合并配置 -->
+              <template v-if="config.mergeType === 'row'">
+                <el-form-item label="选择合并依据列">
+                  <el-select
+                    v-model="config.mergeColumns"
+                    multiple
+                    placeholder="选择哪些列的值相同时进行行合并"
+                    style="width: 100%"
+                    @change="handleConfigChange"
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :disabled="tableInfo.fields.length === 0"
+                  >
+                    <el-option
+                      v-for="field in tableInfo.fields"
+                      :key="field"
+                      :label="field"
+                      :value="field"
+                    />
+                  </el-select>
+                  <div class="config-hint">
+                    <el-text type="info" size="small">
+                      <el-icon><InfoFilled /></el-icon>
+                      当选中列的值相同时，对应的行会合并显示
+                    </el-text>
+                  </div>
+                </el-form-item>
+              </template>
+
+              <!-- 列合并配置 -->
+              <template v-if="config.mergeType === 'column'">
+                <el-form-item label="选择相邻合并列">
+                  <el-select
+                    v-model="config.mergeColumns"
+                    multiple
+                    placeholder="选择相邻的列进行合并"
+                    style="width: 100%"
+                    @change="handleConfigChange"
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :disabled="tableInfo.fields.length === 0"
+                  >
+                    <el-option
+                      v-for="field in tableInfo.fields"
+                      :key="field"
+                      :label="field"
+                      :value="field"
+                    />
+                  </el-select>
+                  <div class="config-hint">
+                    <el-text type="warning" size="small">
+                      <el-icon><Warning /></el-icon>
+                      只有相邻的列且值相同时才会合并
+                    </el-text>
+                  </div>
+                </el-form-item>
+              </template>
+
+              <!-- 混合合并配置 -->
+              <template v-if="config.mergeType === 'mixed'">
+                <el-form-item label="选择合并列组合">
+                  <el-select
+                    v-model="config.mergeColumns"
+                    multiple
+                    placeholder="选择参与混合合并的列"
+                    style="width: 100%"
+                    @change="handleConfigChange"
+                    collapse-tags
+                    collapse-tags-tooltip
+                    :disabled="tableInfo.fields.length === 0"
+                  >
+                    <el-option
+                      v-for="field in tableInfo.fields"
+                      :key="field"
+                      :label="field"
+                      :value="field"
+                    />
+                  </el-select>
+                  <div class="config-hint">
+                    <el-text type="success" size="small">
+                      <el-icon><SuccessFilled /></el-icon>
+                      同时支持行合并和列合并的智能组合模式
+                    </el-text>
+                  </div>
+                </el-form-item>
+              </template>
 
               <el-form-item label="合并条件">
                 <el-radio-group v-model="config.mergeCondition" @change="handleConfigChange" class="condition-group">
@@ -234,8 +334,8 @@
 </template>
 
 <script>
-import { ref, reactive, computed } from 'vue'
-import { Upload, UploadFilled, InfoFilled, Setting, View, Loading, Document } from '@element-plus/icons-vue'
+import { ref, reactive, computed, nextTick } from 'vue'
+import { Upload, UploadFilled, InfoFilled, Setting, View, Loading, Document, Warning, SuccessFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElNotification } from 'element-plus'
 import { fileProcessor } from '@/utils/fileProcessor.js'
 import ExcelHeaderSelector from './ExcelHeaderSelector.vue'
@@ -251,6 +351,8 @@ export default {
     View,
     Loading,
     Document,
+    Warning,
+    SuccessFilled,
     ExcelHeaderSelector,
     AdvancedRuleEditor
   },
@@ -408,6 +510,196 @@ export default {
     const handleExcelHeaderCancel = () => {
       showExcelHeaderSelector.value = false
       currentExcelData.value = null
+    }
+
+    // 加载特定类型的示例数据
+    const loadSpecificSampleData = (type) => {
+      let sampleData = []
+      let mergeConfig = {}
+      
+      console.log('开始加载示例数据，类型:', type)
+      
+      switch (type) {
+        case 'row':
+          // 行合并测试数据 - 部门相同的连续行
+          sampleData = [
+            { name: '张三', department: '技术部', position: '工程师', salary: 8000, project: '电商系统' },
+            { name: '李四', department: '技术部', position: '高级工程师', salary: 12000, project: '支付系统' },
+            { name: '王五', department: '技术部', position: '架构师', salary: 18000, project: '微服务架构' },
+            { name: '赵六', department: '市场部', position: '专员', salary: 6000, project: '品牌推广' },
+            { name: '钱七', department: '市场部', position: '经理', salary: 15000, project: '市场拓展' },
+            { name: '孙八', department: '人事部', position: '专员', salary: 5500, project: '招聘管理' },
+            { name: '周九', department: '人事部', position: '经理', salary: 12000, project: '人才发展' },
+            { name: '吴十', department: '财务部', position: '会计', salary: 7000, project: '财务核算' }
+          ]
+          mergeConfig = {
+            mergeType: 'row',
+            mergeColumns: ['department'],
+            mergeCondition: 'same',
+            showBorder: true,
+            stripe: true
+          }
+          break
+          
+        case 'column':
+          // 列合并测试数据 - 体现表头分组概念
+          sampleData = [
+            { 
+              name: '张三', 
+              region: '华北', 
+              province: '北京', 
+              city: '朝阳区',
+              phone: '138****1234', 
+              email: 'zhangsan@company.com',
+              department: '技术部'
+            },
+            { 
+              name: '李四', 
+              region: '华东', 
+              province: '上海', 
+              city: '浦东区',
+              phone: '139****5678', 
+              email: 'lisi@company.com',
+              department: '销售部'
+            },
+            { 
+              name: '王五', 
+              region: '华南', 
+              province: '广东', 
+              city: '深圳市',
+              phone: '137****9012', 
+              email: 'wangwu@company.com',
+              department: '市场部'
+            },
+            { 
+              name: '赵六', 
+              region: '西部', 
+              province: '四川', 
+              city: '成都市',
+              phone: '136****3456', 
+              email: 'zhaoliu@company.com',
+              department: '人事部'
+            }
+          ]
+          mergeConfig = {
+            mergeType: 'column',
+            mergeColumns: ['region', 'province', 'city'], // 地理信息分组
+            mergeCondition: 'same',
+            showBorder: true,
+            stripe: true
+          }
+          break
+          
+        case 'mixed':
+          // 混合合并测试数据 - 既有行合并又有表头列分组
+          sampleData = [
+            { 
+              department: '技术部', 
+              name: '张三',
+              phone: '138****1234', 
+              email: 'zhangsan@company.com',
+              position: '工程师',
+              level: 'P5'
+            },
+            { 
+              department: '技术部', 
+              name: '李四',
+              phone: '139****5678', 
+              email: 'lisi@company.com',
+              position: '高级工程师',
+              level: 'P6'
+            },
+            { 
+              department: '技术部', 
+              name: '王五',
+              phone: '137****9012', 
+              email: 'wangwu@company.com',
+              position: '架构师',
+              level: 'P7'
+            },
+            { 
+              department: '销售部', 
+              name: '赵六',
+              phone: '136****3456', 
+              email: 'zhaoliu@company.com',
+              position: '销售专员',
+              level: 'P4'
+            },
+            { 
+              department: '销售部', 
+              name: '钱七',
+              phone: '135****7890', 
+              email: 'qianqi@company.com',
+              position: '销售经理',
+              level: 'P6'
+            }
+          ]
+          mergeConfig = {
+            mergeType: 'mixed',
+            mergeColumns: ['phone', 'email'], // 联系方式列分组 + 部门行合并
+            mergeCondition: 'same',
+            showBorder: true,
+            stripe: true
+          }
+          break
+          
+        default:
+          loadSampleData()
+          return
+      }
+      
+      console.log('准备加载的数据:', sampleData)
+      console.log('准备应用的配置:', mergeConfig)
+      
+      // 首先清空当前配置
+      config.mergeType = 'row'
+      config.mergeColumns = []
+      
+      // 加载数据到本地状态
+      tableData.value = sampleData
+      config.endRow = sampleData.length - 1
+      config.startRow = 0
+      
+      // 发送数据变化事件
+      emit('data-change', sampleData)
+      
+      // 自动配置合并设置 - 等待数据加载后再配置
+      nextTick(() => {
+        console.log('开始应用配置...')
+        
+        // 逐个更新配置项
+        config.mergeType = mergeConfig.mergeType
+        config.mergeColumns = [...mergeConfig.mergeColumns]
+        config.mergeCondition = mergeConfig.mergeCondition
+        config.showBorder = mergeConfig.showBorder
+        config.stripe = mergeConfig.stripe
+        
+        console.log('配置更新后的状态:', config)
+        console.log('tableData状态:', tableData.value)
+        
+        // 触发配置变化事件
+        handleConfigChange()
+        
+        // 显示成功消息
+        const typeNames = {
+          'row': '行合并',
+          'column': '列合并', 
+          'mixed': '混合合并'
+        }
+        
+        ElMessage.success({
+          message: `✅ 已加载${typeNames[type]}测试数据并自动配置合并参数`,
+          duration: 3000
+        })
+        
+        // 延迟显示详细信息
+        setTimeout(() => {
+          ElMessage.info({
+            message: `📋 合并类型: ${typeNames[type]} | 合并列: ${mergeConfig.mergeColumns.join(', ')}`,
+            duration: 4000
+          })
+        }, 1000)
+      })
     }
 
     const loadSampleData = () => {
@@ -568,6 +860,13 @@ export default {
     const handleConfigChange = () => {
       emit('config-change', { ...config })
     }
+    
+    // 处理合并类型变化
+    const handleMergeTypeChange = () => {
+      // 当合并类型改变时，清空合并列选择
+      config.mergeColumns = []
+      handleConfigChange()
+    }
 
     // 高级规则相关方法
     const sampleDataForRules = computed(() => {
@@ -610,7 +909,9 @@ export default {
       beforeUpload,
       handleFileChange,
       loadSampleData,
+      loadSpecificSampleData,
       handleConfigChange,
+      handleMergeTypeChange,
       handleAdvancedRuleChange,
       handleExcelHeaderConfirm,
       handleExcelHeaderCancel
@@ -767,6 +1068,109 @@ export default {
 
 .sample-btn {
   width: 100%;
+  margin-bottom: 16px;
+}
+
+/* 配置提示样式 */
+.config-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  border-left: 3px solid #e4e7ed;
+}
+
+.config-hint .el-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-hint .el-text[type="info"] {
+  color: #409eff;
+}
+
+.config-hint .el-text[type="warning"] {
+  color: #e6a23c;
+}
+
+.config-hint .el-text[type="success"] {
+  color: #67c23a;
+}
+
+/* 测试数据卡片样式 */
+.sample-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.sample-card {
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.sample-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+  transform: translateY(-2px);
+}
+
+.sample-card:active {
+  transform: translateY(-1px);
+}
+
+.card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  color: white;
+  font-size: 16px;
+  transition: all 0.3s ease;
+}
+
+.card-icon.row-merge {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+}
+
+.card-icon.column-merge {
+  background: linear-gradient(135deg, #10b981, #047857);
+}
+
+.card-icon.mixed-merge {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+}
+
+.sample-card:hover .card-icon {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.card-content h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 4px 0;
+  line-height: 1.2;
+}
+
+.card-content p {
+  font-size: 11px;
+  color: #6b7280;
+  margin: 0;
+  line-height: 1.3;
 }
 
 /* 表格信息样式 */
