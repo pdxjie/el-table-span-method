@@ -298,14 +298,3 @@ npm run build
 
 **让表格合并变得简单，让开发效率翻倍！** ✨
 
----
-
-<div align="center">
-
-### 🔗 相关链接
-
-[在线演示](https://your-demo-url.com) | [使用文档](https://your-docs-url.com) | [问题反馈](https://github.com/your-repo/table-wiz/issues) | [更新日志](https://github.com/your-repo/table-wiz/releases)
-
-**Made with ❤️ by TableWiz Team**
-
-</div>
