@@ -1,5 +1,5 @@
 import { ElementAdapter, AntdAdapter } from './ElementAdapter.js'
-import { NaiveAdapter, VuetifyAdapter, QuasarAdapter } from './OtherAdapters.js'
+import { NaiveAdapter, VuetifyAdapter } from './OtherAdapters.js'
 
 /**
  * UI库管理器
@@ -21,7 +21,6 @@ export class UILibraryManager {
     this.registerAdapter('ant-design-vue', new AntdAdapter()) 
     this.registerAdapter('naive-ui', new NaiveAdapter())
     this.registerAdapter('vuetify', new VuetifyAdapter())
-    this.registerAdapter('quasar', new QuasarAdapter())
     
     // 默认使用 Element Plus
     this.setCurrentAdapter('element-plus')
@@ -265,8 +264,7 @@ export const UI_LIBRARIES = {
   ELEMENT_PLUS: 'element-plus',
   ANT_DESIGN_VUE: 'ant-design-vue',
   NAIVE_UI: 'naive-ui',
-  VUETIFY: 'vuetify',
-  QUASAR: 'quasar'
+  VUETIFY: 'vuetify'
 }
 
 // 导出UI库元数据
@@ -298,12 +296,5 @@ export const UI_LIBRARY_METADATA = {
     popularity: 'high',
     learnability: 'medium',
     ecosystem: 'excellent'
-  },
-  [UI_LIBRARIES.QUASAR]: {
-    name: 'Quasar',
-    description: '全平台 Vue.js 框架',
-    popularity: 'medium',
-    learnability: 'medium',
-    ecosystem: 'good'
   }
 }

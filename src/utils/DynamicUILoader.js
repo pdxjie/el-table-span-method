@@ -56,11 +56,6 @@ export class DynamicUILoader {
         css: ['https://unpkg.com/vuetify@3/dist/vuetify.min.css'],
         js: ['https://unpkg.com/vuetify@3/dist/vuetify.min.js'],
         globalName: 'Vuetify'
-      },
-      'quasar': {
-        css: ['https://unpkg.com/quasar@2/dist/quasar.prod.css'],
-        js: ['https://unpkg.com/quasar@2/dist/quasar.umd.prod.js'],
-        globalName: 'Quasar'
       }
     }
 

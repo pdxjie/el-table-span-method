@@ -179,13 +179,12 @@ export default {
     const antd = inject('$antd', null)
     const naive = inject('$naive', null) 
     const vuetify = inject('$vuetify', null)
-    const quasar = inject('$quasar', null)
 
     // 所有UI库都已安装，直接标记为可用
     const isLoadingLibrary = ref(false)
     const loadingProgress = ref(0)
     const libraryLoadError = ref('')
-    const availableLibraries = ref(new Set(['element-plus', 'ant-design-vue', 'naive-ui', 'vuetify', 'quasar']))
+    const availableLibraries = ref(new Set(['element-plus', 'ant-design-vue', 'naive-ui', 'vuetify']))
 
     const tableFields = computed(() => {
       if (props.tableData.length === 0) return []
@@ -211,8 +210,6 @@ export default {
           return 'n-data-table'
         case 'vuetify':
           return 'v-data-table'
-        case 'quasar':
-          return 'q-table'
         default:
           return 'div'
       }
@@ -249,14 +246,6 @@ export default {
             'items-per-page': -1,
             'hide-default-footer': true
           }
-        case 'quasar':
-          return {
-            data: processedTableData.value,
-            columns: quasarColumns.value,
-            rowKey: 'id',
-            flat: true,
-            bordered: props.spanConfig.showBorder
-          }
         default:
           return {}
       }
@@ -284,18 +273,6 @@ export default {
               return slots
             }, {})
           }
-        case 'quasar':
-          return {
-            'body-cell': (props) => {
-              if (shouldRenderQuasarCell(props.row, props.col.name)) {
-                return h('q-td', {
-                  class: getQuasarCellClasses(props.row, props.col.name),
-                  rowspan: getQuasarCellRowspan(props.row, props.col.name)
-                }, props.value)
-              }
-              return null
-            }
-          }
         default:
           return {}
       }
@@ -316,8 +293,7 @@ export default {
       const names = {
         'ant-design-vue': 'Ant Design Vue',
         'naive-ui': 'Naive UI',
-        'vuetify': 'Vuetify',
-        'quasar': 'Quasar'
+        'vuetify': 'Vuetify'
       }
       return names[libraryId] || libraryId
     }
@@ -344,10 +320,6 @@ export default {
           case 'vuetify':
             // Vuetify 需要添加合并元数据
             return processVuetifyData(props.tableData, props.spanConfig)
-          
-          case 'quasar':
-            // Quasar 需要添加合并信息
-            return processQuasarData(props.tableData, props.spanConfig)
           
           case 'naive-ui':
           case 'element-plus':
@@ -641,58 +613,6 @@ export default {
       }
 
       return { rowspan, colspan, shouldShow }
-    }
-
-    // Quasar 数据处理函数
-    const processQuasarData = (tableData, spanConfig) => {
-      if (!spanConfig || !spanConfig.mergeColumns || spanConfig.mergeColumns.length === 0) {
-        return tableData
-      }
-      
-      const processedData = []
-      const { mergeColumns, mergeCondition = 'same', customRule } = spanConfig
-      
-      for (let i = 0; i < tableData.length; i++) {
-        const row = { ...tableData[i] }
-        
-        mergeColumns.forEach(column => {
-          const mergeInfo = calculateQuasarSpan(tableData, i, column, mergeCondition, customRule)
-          row._cellMerge = row._cellMerge || {}
-          row._cellMerge[column] = mergeInfo
-        })
-        
-        processedData.push(row)
-      }
-      
-      return processedData
-    }
-    
-    // Quasar 合并计算
-    const calculateQuasarSpan = (data, rowIndex, column, mergeCondition, customRule) => {
-      const currentValue = data[rowIndex][column]
-      let rowspan = 1
-      let shouldRender = true
-
-      // 向下查找相同值
-      for (let i = rowIndex + 1; i < data.length; i++) {
-        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
-          rowspan++
-        } else {
-          break
-        }
-      }
-
-      // 检查是否为合并区域的首行
-      for (let i = rowIndex - 1; i >= 0; i--) {
-        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
-          shouldRender = false
-          break
-        } else {
-          break
-        }
-      }
-
-      return { rowspan, shouldRender }
     }
 
     // 通用合并条件判断函数 - 增强错误处理
@@ -1123,39 +1043,6 @@ export default {
       return mergeInfo && mergeInfo.shouldShow ? mergeInfo.rowspan : 1
     }
 
-    // Quasar 列配置
-    const quasarColumns = computed(() => {
-      if (props.tableData.length === 0) return []
-      
-      const fields = Object.keys(props.tableData[0])
-      return fields.map(field => ({
-        name: field,
-        label: field,
-        field: field,
-        align: 'left',
-        sortable: true
-      }))
-    })
-
-    // Quasar 合并相关方法
-    const shouldRenderQuasarCell = (row, colName) => {
-      const mergeInfo = row._cellMerge && row._cellMerge[colName]
-      return !mergeInfo || mergeInfo.shouldRender
-    }
-
-    const getQuasarCellRowspan = (row, colName) => {
-      const mergeInfo = row._cellMerge && row._cellMerge[colName]
-      return mergeInfo && mergeInfo.shouldRender ? mergeInfo.rowspan : 1
-    }
-
-    const getQuasarCellClasses = (row, colName) => {
-      const mergeInfo = row._cellMerge && row._cellMerge[colName]
-      if (mergeInfo && mergeInfo.shouldRender && mergeInfo.rowspan > 1) {
-        return `merged-cell merged-cell-quasar rowspan-${mergeInfo.rowspan}`
-      }
-      return ''
-    }
-
     const getColumnMinWidth = (field) => {
       const columnCount = tableFields.value.length
 
@@ -1236,7 +1123,6 @@ export default {
       calculateNaiveUISpan,
       shouldMergeNaiveUIValues,
       vuetifyHeaders,
-      quasarColumns,
       shouldShowVuetifyCell,
       getVuetifyCellClass,
       getVuetifyRowspan,
@@ -1249,9 +1135,6 @@ export default {
       calculateVuetifyRowSpan,
       calculateVuetifyColSpan,
       calculateVuetifyMixedSpan,
-      shouldRenderQuasarCell,
-      getQuasarCellRowspan,
-      getQuasarCellClasses,
       getColumnMinWidth,
       refreshPreview,
       getMergeTypeText,
@@ -1569,27 +1452,6 @@ export default {
     padding: 8px 12px;
     font-size: 13px;
   }
-}
-.merged-cell-quasar {
-  vertical-align: middle !important;
-  text-align: center !important;
-}
-
-/* Quasar 表格合并样式 */
-:deep(.q-table .merged-cell-quasar) {
-  vertical-align: middle !important;
-  text-align: center !important;
-  border-bottom: 1px solid #e0e0e0 !important;
-}
-
-/* 移除Quasar合并单元格之间的边框 */
-:deep(.q-table tbody tr td.merged-cell-quasar) {
-  border-bottom: 1px solid transparent !important;
-}
-
-/* 最后一个Quasar合并单元格恢复底部边框 */
-:deep(.q-table tbody tr td.merged-cell-quasar:not([rowspan="1"])) {
-  border-bottom: 1px solid #e0e0e0 !important;
 }
 
 /* 空状态 */

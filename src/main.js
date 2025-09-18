@@ -16,11 +16,6 @@ import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
-// Quasar
-import { Quasar } from 'quasar'
-import '@quasar/extras/material-icons/material-icons.css'
-import 'quasar/dist/quasar.css'
-
 import './style.css'
 import App from './App.vue'
 
@@ -37,9 +32,6 @@ app.use(ElementPlus)
 app.use(Antd)
 app.use(naive)
 app.use(vuetify)
-app.use(Quasar, {
-  plugins: {}, // import Quasar plugins and add here
-})
 
 // 注册 Element Plus 图标
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
@@ -50,6 +42,5 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.provide('$antd', Antd)
 app.provide('$naive', naive)
 app.provide('$vuetify', vuetify)
-app.provide('$quasar', Quasar)
 
 app.mount('#app')
