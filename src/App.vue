@@ -19,10 +19,21 @@
     <main class="app-main" :class="{ 'vertical-layout': isVerticalLayout }">
       <!-- 配置侧边栏 -->
       <aside class="config-sidebar">
-        <ConfigPanel
-          @data-change="handleDataChange"
-          @config-change="handleConfigChange"
-        />
+        <!-- UI库选择器 - 固定在顶部 -->
+        <div class="sidebar-header">
+          <UILibrarySelector
+            :current-library="currentLibrary"
+            @library-change="handleLibraryChange"
+          />
+        </div>
+        
+        <!-- 配置面板 - 可滚动内容 -->
+        <div class="sidebar-content">
+          <ConfigPanel
+            @data-change="handleDataChange"
+            @config-change="handleConfigChange"
+          />
+        </div>
       </aside>
 
       <!-- 内容面板 -->
@@ -41,9 +52,10 @@
               </div>
             </template>
             <div class="tab-content-wrapper">
-              <TablePreview
+              <UniversalTablePreview
                 :table-data="tableData"
                 :span-config="spanConfig"
+                :current-library="currentLibrary"
                 @span-method="handleSpanMethod"
               />
             </div>
@@ -60,6 +72,7 @@
               <CodeGenerator
                 :span-config="spanConfig"
                 :generated-code="generatedCode"
+                :current-library="currentLibrary"
                 :is-active="activeTab === 'code'"
               />
             </div>
@@ -74,16 +87,19 @@
 import { ref, computed } from 'vue'
 import { Grid, View, Document, Menu } from '@element-plus/icons-vue'
 import ConfigPanel from './components/ConfigPanel.vue'
-import TablePreview from './components/TablePreview.vue'
+import UniversalTablePreview from './components/UniversalTablePreview.vue'
 import CodeGenerator from './components/CodeGenerator.vue'
+import UILibrarySelector from './components/UILibrarySelector.vue'
 import { generateSpanMethod } from './utils/spanMethod.js'
+import { uiLibraryManager } from './adapters/UILibraryManager.js'
 
 export default {
   name: 'App',
   components: {
     ConfigPanel,
-    TablePreview,
+    UniversalTablePreview,
     CodeGenerator,
+    UILibrarySelector,
     Grid,
     View,
     Document,
@@ -99,6 +115,7 @@ export default {
     })
     const activeTab = ref('preview')
     const isVerticalLayout = ref(false)
+    const currentLibrary = ref('element-plus') // 添加当前UI库状态
 
     const handleDataChange = (data) => {
       tableData.value = data
@@ -108,6 +125,18 @@ export default {
 
     const handleConfigChange = (config) => {
       spanConfig.value = { ...spanConfig.value, ...config }
+    }
+
+    // 处理UI库切换
+    const handleLibraryChange = (libraryId) => {
+      currentLibrary.value = libraryId
+      
+      // 更新UI库管理器
+      try {
+        uiLibraryManager.setCurrentAdapter(libraryId)
+      } catch (error) {
+        console.error('切换UI库失败:', error)
+      }
     }
 
     const handleSpanMethod = ({ row, column, rowIndex, columnIndex }) => {
@@ -167,8 +196,10 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
       generatedCode,
       activeTab,
       isVerticalLayout,
+      currentLibrary,
       handleDataChange,
       handleConfigChange,
+      handleLibraryChange,
       handleSpanMethod,
       toggleLayout
     }
@@ -262,14 +293,35 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e5e7eb;
-  overflow: hidden;
   height: calc(100vh - 130px);
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .vertical-layout .config-sidebar {
   width: 100%;
   height: auto;
+}
+
+.vertical-layout .sidebar-header {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.vertical-layout .sidebar-content {
+  overflow-y: visible;
 }
 
 /* 内容面板 */
@@ -417,6 +469,10 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
     height: calc(100vh - 108px);
   }
 
+  .sidebar-content {
+    overflow-y: auto;
+  }
+
   .content-panel {
     height: calc(100vh - 108px);
   }
@@ -450,6 +506,11 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   .config-sidebar {
     width: 100%;
     height: auto;
+    overflow: visible;
+  }
+
+  .sidebar-content {
+    overflow-y: visible;
   }
 
   .content-panel {
