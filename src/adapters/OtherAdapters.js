@@ -291,19 +291,32 @@ export class VuetifyAdapter extends UILibraryAdapter {
     }
   }
 
+  getFeatures() {
+    return {
+      rowSpan: true,
+      colSpan: true,
+      mixedSpan: true, // 支持混合合并
+      customRender: true,
+      virtualScroll: false,
+      sortable: true,
+      resizable: false
+    }
+  }
+
   generateSpanMethod(config) {
-    const { mergeType, mergeColumns, mergeCondition, customRule } = config
+    const { mergeType, mergeColumns, mergeCondition, customRule, startRow = 0, endRow } = config
     
     return `const processDataWithMerge = (data) => {
   const processedData = []
   const mergeColumns = ${JSON.stringify(mergeColumns)}
+  const mergeType = '${mergeType}'
   
   for (let i = 0; i < data.length; i++) {
     const row = { ...data[i] }
+    row._merge = {}
     
     mergeColumns.forEach(column => {
-      const spanInfo = calculateMergeSpan(data, i, column)
-      row._merge = row._merge || {}
+      const spanInfo = calculateMergeSpan(data, i, column, mergeType)
       row._merge[column] = spanInfo
     })
     
@@ -313,13 +326,35 @@ export class VuetifyAdapter extends UILibraryAdapter {
   return processedData
 }
 
-const calculateMergeSpan = (data, rowIndex, column) => {
+const calculateMergeSpan = (data, rowIndex, column, mergeType) => {
+  const currentValue = data[rowIndex][column]
+  const startRow = ${startRow}
+  const endRow = ${endRow !== undefined ? endRow : 'data.length - 1'}
+  
+  // 检查是否在合并范围内
+  if (rowIndex < startRow || rowIndex > endRow) {
+    return { rowspan: 1, colspan: 1, shouldShow: true }
+  }
+  
+  if (mergeType === 'row') {
+    return calculateRowSpan(data, rowIndex, column, startRow, endRow)
+  } else if (mergeType === 'column') {
+    return calculateColSpan(data, rowIndex, column)
+  } else if (mergeType === 'mixed') {
+    return calculateMixedSpan(data, rowIndex, column, startRow, endRow)
+  }
+  
+  return { rowspan: 1, colspan: 1, shouldShow: true }
+}
+
+const calculateRowSpan = (data, rowIndex, column, startRow, endRow) => {
   const currentValue = data[rowIndex][column]
   let rowspan = 1
   let shouldShow = true
 
-  // 计算行合并数量
-  for (let i = rowIndex + 1; i < data.length; i++) {
+  // 向下计算行合并数量
+  const maxIndex = Math.min(endRow, data.length - 1)
+  for (let i = rowIndex + 1; i <= maxIndex; i++) {
     if (shouldMerge(data[i][column], currentValue)) {
       rowspan++
     } else {
@@ -328,7 +363,7 @@ const calculateMergeSpan = (data, rowIndex, column) => {
   }
 
   // 检查是否应该隐藏（不是合并的第一行）
-  for (let i = rowIndex - 1; i >= 0; i--) {
+  for (let i = rowIndex - 1; i >= startRow; i--) {
     if (shouldMerge(data[i][column], currentValue)) {
       shouldShow = false
       break
@@ -337,7 +372,113 @@ const calculateMergeSpan = (data, rowIndex, column) => {
     }
   }
 
-  return { rowspan, shouldShow }
+  return { rowspan, colspan: 1, shouldShow }
+}
+
+const calculateColSpan = (data, rowIndex, column) => {
+  const currentValue = data[rowIndex][column]
+  const allFields = Object.keys(data[0])
+  const currentFieldIndex = allFields.indexOf(column)
+  const mergeColumns = ${JSON.stringify(mergeColumns)}
+  let colspan = 1
+  let shouldShow = true
+
+  // 向右计算列合并数量
+  for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+    const nextField = allFields[i]
+    if (!mergeColumns.includes(nextField)) break
+    
+    if (shouldMerge(data[rowIndex][nextField], currentValue)) {
+      colspan++
+    } else {
+      break
+    }
+  }
+
+  // 检查是否应该隐藏（不是合并的第一列）
+  for (let i = currentFieldIndex - 1; i >= 0; i--) {
+    const prevField = allFields[i]
+    if (!mergeColumns.includes(prevField)) break
+    
+    if (shouldMerge(data[rowIndex][prevField], currentValue)) {
+      shouldShow = false
+      break
+    } else {
+      break
+    }
+  }
+
+  return { rowspan: 1, colspan, shouldShow }
+}
+
+const calculateMixedSpan = (data, rowIndex, column, startRow, endRow) => {
+  const currentValue = data[rowIndex][column]
+  const allFields = Object.keys(data[0])
+  const currentFieldIndex = allFields.indexOf(column)
+  const mergeColumns = ${JSON.stringify(mergeColumns)}
+  
+  let rowspan = 1
+  let colspan = 1
+  let shouldShow = true
+
+  // 1. 先计算行合并
+  const maxRowIndex = Math.min(endRow, data.length - 1)
+  for (let i = rowIndex + 1; i <= maxRowIndex; i++) {
+    if (shouldMerge(data[i][column], currentValue)) {
+      rowspan++
+    } else {
+      break
+    }
+  }
+
+  // 2. 再计算列合并
+  for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+    const nextField = allFields[i]
+    if (!mergeColumns.includes(nextField)) break
+    
+    // 检查这一列的所有相关行是否都有相同值
+    let canMergeColumn = true
+    for (let row = rowIndex; row < rowIndex + rowspan; row++) {
+      if (!shouldMerge(data[row][nextField], currentValue)) {
+        canMergeColumn = false
+        break
+      }
+    }
+    
+    if (canMergeColumn) {
+      colspan++
+    } else {
+      break
+    }
+  }
+
+  // 3. 检查是否应该隐藏
+  // 检查行方向
+  for (let i = rowIndex - 1; i >= startRow; i--) {
+    if (shouldMerge(data[i][column], currentValue)) {
+      shouldShow = false
+      break
+    } else {
+      break
+    }
+  }
+  
+  // 检查列方向（只有在行方向没有隐藏的情况下）
+  if (shouldShow) {
+    for (let i = currentFieldIndex - 1; i >= 0; i--) {
+      const prevField = allFields[i]
+      if (!mergeColumns.includes(prevField)) break
+      
+      if (shouldMerge(data[rowIndex][prevField], currentValue)) {
+        shouldShow = false
+        break
+      } else {
+        break
+      }
+    }
+  }
+
+  return { rowspan, colspan, shouldShow }
 }
 
 const shouldMerge = (value1, value2) => {
@@ -354,8 +495,8 @@ const shouldMerge = (value1, value2) => {
 
 const getCellClass = (item, field) => {
   const mergeInfo = item._merge && item._merge[field]
-  if (mergeInfo && mergeInfo.shouldShow && mergeInfo.rowspan > 1) {
-    return \`merged-cell rowspan-\${mergeInfo.rowspan}\`
+  if (mergeInfo && mergeInfo.shouldShow && (mergeInfo.rowspan > 1 || mergeInfo.colspan > 1)) {
+    return \`merged-cell rowspan-\${mergeInfo.rowspan} colspan-\${mergeInfo.colspan}\`
   }
   return ''
 }
