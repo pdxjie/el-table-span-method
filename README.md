@@ -17,7 +17,7 @@
 
 ### 30秒体验
 ```bash
-git clone https://github.com/your-repo/table-wiz.git
+git clone https://github.com/pdxjie/el-table-span-method.git
 cd table-wiz
 npm install
 npm run dev
@@ -267,7 +267,7 @@ A: 完全支持！响应式设计确保在手机、平板上都有良好体验�
 ### 本地开发
 ```bash
 # 克隆项目
-git clone https://github.com/your-repo/table-wiz.git
+git clone https://github.com/pdxjie/el-table-span-method.git
 
 # 安装依赖
 npm install
