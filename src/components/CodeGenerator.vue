@@ -50,7 +50,7 @@
         <div class="editor-toolbar">
           <div class="file-info">
             <el-icon class="file-icon"><Document /></el-icon>
-            <span class="filename">table-span-{{ codeType }}.vue</span>
+            <span class="filename">{{ currentLibraryInfo.name.toLowerCase().replace(/\s+/g, '-') }}-table-{{ codeType }}.vue</span>
           </div>
           <div class="code-stats">
             <span class="lines-count">{{ codeLineCount }} 行</span>
@@ -73,6 +73,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { Document, CopyDocument, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as monaco from 'monaco-editor'
+import { uiLibraryManager } from '../adapters/UILibraryManager.js'
 
 export default {
   name: 'CodeGenerator',
@@ -89,6 +90,10 @@ export default {
     isActive: {
       type: Boolean,
       default: false
+    },
+    currentLibrary: {
+      type: String,
+      default: 'element-plus'
     }
   },
   setup(props) {
@@ -96,206 +101,29 @@ export default {
     const editorContainer = ref(null)
     let monacoEditor = null
 
+    // 当前UI库信息
+    const currentLibraryInfo = computed(() => {
+      const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
+      return adapter ? adapter.getInfo() : { name: 'Unknown' }
+    })
+
     // 代码生成函数
     const generateFullCode = (config, type) => {
-      if (type === 'vue3') {
-        return generateVue3Code(config)
-      } else {
-        return generateVue2Code(config)
-      }
-    }
-
-    const generateVue3Code = (config) => {
-      const { mergeType = 'row', mergeColumns = [], mergeCondition = 'same', customRule = '' } = config
-
-      return `<template>
-  <div class="table-container">
-    <el-table
-      :data="tableData"
-      :span-method="spanMethod"
-      border
-      style="width: 100%"
-    >
-      <el-table-column
-        v-for="field in tableFields"
-        :key="field"
-        :prop="field"
-        :label="field"
-        show-overflow-tooltip
-      />
-    </el-table>
-  </div>
-</template>
-
-<script setup>
-import { ref, computed } from 'vue'
-
-const tableData = ref([
-  // 在这里添加你的数据
-])
-
-const tableFields = computed(() => {
-  if (tableData.value.length === 0) return []
-  return Object.keys(tableData.value[0])
-})
-
-const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
-  const mergeColumns = ${JSON.stringify(mergeColumns)}
-  const mergeType = '${mergeType}'
-
-  if (!mergeColumns.includes(column.property)) {
-    return { rowspan: 1, colspan: 1 }
-  }
-
-  if (mergeType === 'row') {
-    return calculateRowSpan({ row, column, rowIndex, columnIndex })
-  }
-
-  return { rowspan: 1, colspan: 1 }
-}
-
-const calculateRowSpan = ({ row, column, rowIndex, columnIndex }) => {
-  const currentValue = row[column.property]
-  let rowspan = 1
-  let colspan = 1
-
-  for (let i = rowIndex + 1; i < tableData.value.length; i++) {
-    if (shouldMerge(tableData.value[i][column.property], currentValue)) {
-      rowspan++
-    } else {
-      break
-    }
-  }
-
-  for (let i = rowIndex - 1; i >= 0; i--) {
-    if (shouldMerge(tableData.value[i][column.property], currentValue)) {
-      return { rowspan: 0, colspan: 0 }
-    } else {
-      break
-    }
-  }
-
-  return { rowspan, colspan }
-}
-
-const shouldMerge = (value1, value2) => {
-  ${mergeCondition === 'custom' && customRule ?
-    `try {
-    return (${customRule})(value1, value2)
-  } catch (error) {
-    console.error('自定义规则执行错误:', error)
-    return value1 === value2
-  }` :
-    'return value1 === value2'
-  }
-}
-<\\/script>
-
-<style scoped>
-.table-container {
-  padding: 20px;
-}
-</style>`
-    }
-
-    const generateVue2Code = (config) => {
-      const { mergeType = 'row', mergeColumns = [], mergeCondition = 'same', customRule = '' } = config
-
-      return `<template>
-  <div class="table-container">
-    <el-table
-      :data="tableData"
-      :span-method="spanMethod"
-      border
-      style="width: 100%"
-    >
-      <el-table-column
-        v-for="field in tableFields"
-        :key="field"
-        :prop="field"
-        :label="field"
-        show-overflow-tooltip
-      />
-    </el-table>
-  </div>
-</template>
-
-<script>
-export default {
-  name: 'TableWithSpan',
-  data() {
-    return {
-      tableData: [
-        // 在这里添加你的数据
-      ]
-    }
-  },
-  computed: {
-    tableFields() {
-      if (this.tableData.length === 0) return []
-      return Object.keys(this.tableData[0])
-    }
-  },
-  methods: {
-    spanMethod({ row, column, rowIndex, columnIndex }) {
-      const mergeColumns = ${JSON.stringify(mergeColumns)}
-      const mergeType = '${mergeType}'
-
-      if (!mergeColumns.includes(column.property)) {
-        return { rowspan: 1, colspan: 1 }
-      }
-
-      if (mergeType === 'row') {
-        return this.calculateRowSpan({ row, column, rowIndex, columnIndex })
-      }
-
-      return { rowspan: 1, colspan: 1 }
-    },
-
-    calculateRowSpan({ row, column, rowIndex, columnIndex }) {
-      const currentValue = row[column.property]
-      let rowspan = 1
-      let colspan = 1
-
-      for (let i = rowIndex + 1; i < this.tableData.length; i++) {
-        if (this.shouldMerge(this.tableData[i][column.property], currentValue)) {
-          rowspan++
-        } else {
-          break
+      try {
+        const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
+        if (!adapter) {
+          throw new Error(`未找到 ${props.currentLibrary} 的适配器`)
         }
-      }
 
-      for (let i = rowIndex - 1; i >= 0; i--) {
-        if (this.shouldMerge(this.tableData[i][column.property], currentValue)) {
-          return { rowspan: 0, colspan: 0 }
+        if (type === 'vue3') {
+          return adapter.generateVue3Code(config)
         } else {
-          break
+          return adapter.generateVue2Code(config)
         }
-      }
-
-      return { rowspan, colspan }
-    },
-
-    shouldMerge(value1, value2) {
-      ${mergeCondition === 'custom' && customRule ?
-        `try {
-        return (${customRule})(value1, value2)
       } catch (error) {
-        console.error('自定义规则执行错误:', error)
-        return value1 === value2
-      }` :
-        'return value1 === value2'
+        console.error('代码生成错误:', error)
+        return `// 代码生成失败: ${error.message}\n// 请检查适配器配置`
       }
-    }
-  }
-}
-<\\/script>
-
-<style scoped>
-.table-container {
-  padding: 20px;
-}
-</style>`
     }
 
     const displayCode = computed(() => {
@@ -305,6 +133,13 @@ export default {
     const codeLineCount = computed(() => {
       return displayCode.value.split('\n').length
     })
+
+    // 监听当前UI库变化，更新UI库管理器
+    watch(() => props.currentLibrary, (newLibrary) => {
+      if (uiLibraryManager.hasAdapter(newLibrary)) {
+        uiLibraryManager.setCurrentAdapter(newLibrary)
+      }
+    }, { immediate: true })
 
     // 初始化 Monaco Editor
     const initMonacoEditor = async () => {
@@ -489,7 +324,8 @@ export default {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `table-span-${codeType.value}.vue`
+      const filename = `${currentLibraryInfo.value.name.toLowerCase().replace(/\s+/g, '-')}-table-${codeType.value}.vue`
+      link.download = filename
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -503,7 +339,8 @@ export default {
       codeLineCount,
       editorContainer,
       copyCode,
-      downloadCode
+      downloadCode,
+      currentLibraryInfo
     }
   }
 }
