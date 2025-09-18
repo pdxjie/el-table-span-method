@@ -149,6 +149,7 @@ import { ref, computed, watch, inject, nextTick, h, toRef } from 'vue'
 import { Loading, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { uiLibraryManager } from '../adapters/UILibraryManager.js'
+import { message } from 'ant-design-vue'
 
 export default {
   name: 'UniversalTablePreview',
@@ -229,11 +230,14 @@ export default {
           }
         case 'naive-ui':
           return {
-            data: processedTableData.value,
+            data: props.tableData, // 使用原始数据，不需要预处理
             columns: naiveColumns.value,
-            bordered: props.spanConfig.showBorder,
-            size: 'small',
-            'single-line': false
+            bordered: props.spanConfig.showBorder !== false,
+            striped: props.spanConfig.stripe || false,
+            size: 'medium',
+            'single-line': false,
+            pagination: false,
+            'scroll-x': tableFields.value.length > 6 ? 1200 : undefined
           }
         case 'vuetify':
           return {
@@ -765,22 +769,84 @@ export default {
       }))
     })
 
-    // Naive UI 列配置
+    // Naive UI 列配置 - 使用官方 rowSpan 和 colSpan 函数
     const naiveColumns = computed(() => {
       if (props.tableData.length === 0) return []
       
       const fields = Object.keys(props.tableData[0])
-      const { mergeColumns = [] } = props.spanConfig || {}
+      const { mergeColumns = [], mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
       
       return fields.map(field => ({
         title: field,
         key: field,
-        render: mergeColumns.includes(field) ? (rowData, rowIndex) => {
-          // Naive UI 的合并渲染逻辑
-          return rowData[field]
-        } : (rowData) => rowData[field]
+        // 使用 Naive UI 官方的 rowSpan 和 colSpan 函数
+        rowSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
+          const spanInfo = calculateNaiveUISpan(props.tableData, rowIndex, field, props.spanConfig)
+          return spanInfo.rowSpan
+        } : undefined,
+        colSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
+          const spanInfo = calculateNaiveUISpan(props.tableData, rowIndex, field, props.spanConfig)
+          return spanInfo.colSpan
+        } : undefined
       }))
     })
+    
+    // Naive UI 合并计算函数 - 按照官方文档实现
+    const calculateNaiveUISpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig || {}
+      const currentValue = tableData[rowIndex][field]
+      let rowSpan = 1
+      let colSpan = 1
+      
+      // 检查是否在合并范围内
+      const actualEndRow = endRow !== undefined ? endRow : tableData.length - 1
+      if (rowIndex < startRow || rowIndex > actualEndRow) {
+        return { rowSpan: 1, colSpan: 1 }
+      }
+
+      // 向下计算行合并 - 只在合并范围内
+      const maxIndex = Math.min(actualEndRow, tableData.length - 1)
+      for (let i = rowIndex + 1; i <= maxIndex; i++) {
+        if (shouldMergeNaiveUIValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否为合并区域的第一行 - 只在合并范围内检查
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (shouldMergeNaiveUIValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+          // 不是第一行，隐藏这个单元格
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowSpan, colSpan }
+    }
+    
+    // Naive UI 合并条件判断
+    const shouldMergeNaiveUIValues = (value1, value2, mergeCondition, customRule) => {
+      try {
+        if (mergeCondition === 'custom' && customRule) {
+          const mergeFunction = new Function('value1', 'value2', `
+            try {
+              return ${customRule}
+            } catch (e) {
+              console.error('Custom rule execution error:', e)
+              return value1 === value2
+            }
+          `)
+          return mergeFunction(value1, value2)
+        }
+        return value1 === value2
+      } catch (error) {
+        console.error('Naive UI 合并条件判断出错:', error)
+        return value1 === value2
+      }
+    }
 
     // Vuetify 表头配置
     const vuetifyHeaders = computed(() => {
@@ -928,8 +994,7 @@ export default {
     }
 
     const refreshPreview = () => {
-      // 强制重新渲染表格
-      // 可以在这里添加刷新逻辑
+      message.success('这是一个 Demo!')
     }
 
     const getMergeTypeText = () => {
@@ -985,6 +1050,8 @@ export default {
       spanMethod,
       antdColumns,
       naiveColumns,
+      calculateNaiveUISpan,
+      shouldMergeNaiveUIValues,
       vuetifyHeaders,
       quasarColumns,
       shouldShowVuetifyCell,

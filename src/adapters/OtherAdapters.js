@@ -2,6 +2,7 @@ import { UILibraryAdapter } from './UILibraryAdapter.js'
 
 /**
  * Naive UI 适配器
+ * 使用官方 rowSpan 和 colSpan 函数实现表格合并
  */
 export class NaiveAdapter extends UILibraryAdapter {
   constructor(config = {}) {
@@ -15,7 +16,7 @@ export class NaiveAdapter extends UILibraryAdapter {
   }
 
   generateSpanMethod(config) {
-    const { mergeType, mergeColumns, mergeCondition, customRule } = config
+    const { mergeType, mergeColumns, mergeCondition, customRule, startRow = 0, endRow } = config
     
     return `const createColumns = (tableData) => {
   if (tableData.length === 0) return []
@@ -26,30 +27,34 @@ export class NaiveAdapter extends UILibraryAdapter {
   return fields.map(field => ({
     title: field,
     key: field,
-    render: mergeColumns.includes(field) ? (rowData, rowIndex) => {
-      const spanInfo = calculateSpanForCell(tableData, rowIndex, field)
-      
-      if (spanInfo.rowSpan === 0 || spanInfo.colSpan === 0) {
-        return null
-      }
-      
-      return h('div', {
-        style: {
-          gridRow: \`span \${spanInfo.rowSpan}\`,
-          gridColumn: \`span \${spanInfo.colSpan}\`
-        }
-      }, rowData[field])
-    } : (rowData) => rowData[field]
+    // 使用 Naive UI 官方的 rowSpan 和 colSpan 函数
+    rowSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
+      const spanInfo = calculateNaiveSpanForCell(tableData, rowIndex, field)
+      return spanInfo.rowSpan
+    } : undefined,
+    colSpan: mergeColumns.includes(field) ? (rowData, rowIndex) => {
+      const spanInfo = calculateNaiveSpanForCell(tableData, rowIndex, field)
+      return spanInfo.colSpan
+    } : undefined
   }))
 }
 
-const calculateSpanForCell = (data, rowIndex, column) => {
+const calculateNaiveSpanForCell = (data, rowIndex, column) => {
   const currentValue = data[rowIndex][column]
   let rowSpan = 1
   let colSpan = 1
+  
+  // 检查是否在合并范围内
+  const startRow = ${startRow}
+  const endRow = ${endRow !== undefined ? endRow : 'data.length - 1'}
+  
+  if (rowIndex < startRow || rowIndex > endRow) {
+    return { rowSpan: 1, colSpan: 1 }
+  }
 
-  // 计算行合并
-  for (let i = rowIndex + 1; i < data.length; i++) {
+  // 向下计算行合并 - 只在合并范围内
+  const maxIndex = Math.min(endRow, data.length - 1)
+  for (let i = rowIndex + 1; i <= maxIndex; i++) {
     if (shouldMerge(data[i][column], currentValue)) {
       rowSpan++
     } else {
@@ -57,9 +62,10 @@ const calculateSpanForCell = (data, rowIndex, column) => {
     }
   }
 
-  // 检查是否为合并区域的第一行
-  for (let i = rowIndex - 1; i >= 0; i--) {
+  // 检查是否为合并区域的第一行 - 只在合并范围内检查
+  for (let i = rowIndex - 1; i >= startRow; i--) {
     if (shouldMerge(data[i][column], currentValue)) {
+      // 不是第一行，隐藏这个单元格
       return { rowSpan: 0, colSpan: 0 }
     } else {
       break
@@ -91,15 +97,18 @@ const shouldMerge = (value1, value2) => {
     <n-data-table
       :data="tableData"
       :columns="tableColumns"
-      :bordered="${showBorder || true}"
+      :bordered="${showBorder !== false}"
       :striped="${stripe || false}"
       :scroll-x="1200"
+      :pagination="false"
+      :single-line="false"
+      size="medium"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, h } from 'vue'
+import { ref, computed } from 'vue'
 
 const tableData = ref([
   // 在这里添加你的数据
@@ -116,6 +125,22 @@ const tableColumns = computed(() => {
 .table-container {
   padding: 20px;
 }
+
+/* Naive UI 表格合并样式优化 */
+:deep(.n-data-table .n-data-table-td) {
+  vertical-align: middle;
+}
+
+:deep(.n-data-table .n-data-table-td[rowspan]) {
+  text-align: center;
+  font-weight: 500;
+  background-color: #fafafa;
+}
+
+:deep(.n-data-table .n-data-table-thead .n-data-table-th) {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
 </style>`
   }
 
@@ -128,9 +153,12 @@ const tableColumns = computed(() => {
     <n-data-table
       :data="tableData"
       :columns="tableColumns"
-      :bordered="${showBorder || true}"
+      :bordered="${showBorder !== false}"
       :striped="${stripe || false}"
       :scroll-x="1200"
+      :pagination="false"
+      :single-line="false"
+      size="medium"
     />
   </div>
 </template>
@@ -151,7 +179,7 @@ export default {
     }
   },
   methods: {
-    ${spanMethodCode.replace(/const /g, '').replace('h(', 'this.$createElement(')}
+    ${spanMethodCode.replace(/const /g, '')}
   }
 }
 </script>
@@ -160,12 +188,40 @@ export default {
 .table-container {
   padding: 20px;
 }
+
+/* Naive UI 表格合并样式优化 */
+>>> .n-data-table .n-data-table-td {
+  vertical-align: middle;
+}
+
+>>> .n-data-table .n-data-table-td[rowspan] {
+  text-align: center;
+  font-weight: 500;
+  background-color: #fafafa;
+}
+
+>>> .n-data-table .n-data-table-thead .n-data-table-th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
 </style>`
   }
 
   processTableData(tableData, spanConfig) {
-    // Naive UI 不需要预处理数据，在渲染时处理
+    // Naive UI 不需要预处理数据，使用 rowSpan 和 colSpan 函数在渲染时动态计算
     return tableData
+  }
+  
+  getFeatures() {
+    return {
+      rowSpan: true,
+      colSpan: true,
+      mixedSpan: false, // 混合合并会降级为行合并
+      customRender: true,
+      virtualScroll: true,
+      sortable: true,
+      resizable: false
+    }
   }
 
   getTableConfig(config) {
@@ -174,8 +230,11 @@ export default {
       props: {
         data: 'tableData',
         columns: 'tableColumns',
-        bordered: config.showBorder || true,
-        striped: config.stripe || false
+        bordered: config.showBorder !== false,
+        striped: config.stripe || false,
+        'single-line': false,
+        pagination: false,
+        size: 'medium'
       }
     }
   }
@@ -199,14 +258,19 @@ export default {
   getDocumentation() {
     return {
       notes: [
-        'Naive UI 使用 render 函数实现单元格合并',
-        '通过自定义渲染函数控制单元格显示',
-        '支持复杂的单元格内容渲染'
+        'Naive UI 使用 rowSpan 和 colSpan 函数控制单元格合并',
+        '返回 0 时隐藏单元格，实现合并效果',
+        '支持动态计算合并范围和自定义合并条件',
+        '⚠️ 推荐使用行合并，列合并支持有限'
       ],
       links: [
         {
           title: 'Naive UI 数据表格文档',
           url: 'https://www.naiveui.com/zh-CN/os-theme/components/data-table'
+        },
+        {
+          title: '表格合并示例',
+          url: 'https://www.naiveui.com/zh-CN/os-theme/components/data-table#colspan-rowspan.vue'
         }
       ]
     }

@@ -82,7 +82,6 @@
             size="small" 
             type="text" 
             @click="copyInstallCommand"
-            :icon="CopyDocument"
             title="复制命令"
           >
             <el-icon><CopyDocument /></el-icon>
