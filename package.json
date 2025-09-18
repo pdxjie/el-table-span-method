@@ -1,7 +1,7 @@
 {
-  "name": "el-table-span-method",
+  "name": "table-wiz",
   "version": "1.0.0",
-  "description": "El-Table Span Method 可视化配置工具",
+  "description": "TableWiz - 表格魔法师，让合并变得简单",
   "type": "module",
   "scripts": {
     "dev": "vite",

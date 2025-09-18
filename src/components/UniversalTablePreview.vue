@@ -361,7 +361,7 @@ export default {
           return {
             dataSource: props.tableData, // 使用原始数据，不需要预处理
             columns: antdColumns.value,
-            bordered: props.spanConfig.showBorder !== false,
+            bordered: props.spanConfig.showBorder,
             size: 'middle',
             pagination: false,
             scroll: { x: 'max-content' },
@@ -371,8 +371,8 @@ export default {
           return {
             data: props.tableData, // 使用原始数据，不需要预处理
             columns: naiveColumns.value,
-            bordered: props.spanConfig.showBorder !== false,
-            striped: props.spanConfig.stripe || false,
+            bordered: props.spanConfig.showBorder,
+            striped: props.spanConfig.stripe,
             size: 'medium',
             'single-line': false,
             pagination: false,
@@ -2093,6 +2093,7 @@ export default {
   border-radius: 8px;
 }
 
+/* Vuetify表格边框控制 */
 .vuetify-custom-table {
   width: 100%;
   border-collapse: separate;
@@ -2107,6 +2108,10 @@ export default {
   border: 1px solid #e0e0e0;
 }
 
+.vuetify-custom-table:not(.bordered) {
+  border: none;
+}
+
 /* 多层表头样式 */
 .vuetify-header-row {
   background: #f5f5f5;
@@ -2118,9 +2123,19 @@ export default {
   font-weight: 600;
   padding: 12px 16px;
   text-align: center;
+  position: relative;
+}
+
+/* 边框模式下的表头边框 */
+.vuetify-custom-table.bordered .vuetify-header {
   border-bottom: 1px solid #e0e0e0;
   border-right: 1px solid #e0e0e0;
-  position: relative;
+}
+
+/* 非边框模式下的表头边框 */
+.vuetify-custom-table:not(.bordered) .vuetify-header {
+  border-bottom: 1px solid #e0e0e0;
+  border-right: none;
 }
 
 .vuetify-header.merged-header {
@@ -2142,34 +2157,35 @@ export default {
   border-top: none;
 }
 
-.vuetify-header:last-child {
-  border-right: none;
-}
-
-.vuetify-custom-table.bordered .vuetify-header {
-  border-right: 1px solid #e0e0e0;
+/* 最后一列不显示右边框 */
+.vuetify-header:last-child,
+.vuetify-cell:last-child {
+  border-right: none !important;
 }
 
 .vuetify-cell {
   padding: 12px 16px;
-  border-bottom: 1px solid #e0e0e0;
-  border-right: 1px solid #e0e0e0;
   transition: background-color 0.2s;
   position: relative;
   vertical-align: top;
+}
+
+/* 边框模式下的单元格边框 */
+.vuetify-custom-table.bordered .vuetify-cell {
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+}
+
+/* 非边框模式下的单元格边框 */
+.vuetify-custom-table:not(.bordered) .vuetify-cell {
+  border-bottom: 1px solid #e0e0e0;
+  border-right: none;
 }
 
 .vuetify-cell.merged-group-cell {
   background: #f8f8f8;
 }
 
-.vuetify-cell:last-child {
-  border-right: none;
-}
-
-.vuetify-custom-table.bordered .vuetify-cell {
-  border-right: 1px solid #e0e0e0;
-}
 
 /* 合并单元格特殊样式 - 支持行、列、混合合并 */
 .merged-cell-custom {
@@ -2217,13 +2233,22 @@ export default {
   border-top: none !important;
 }
 
-/* 条纹效果 */
-.striped-row .vuetify-cell {
+/* Vuetify斑马纹控制 */
+.vuetify-custom-table.striped tbody tr:nth-child(odd) .vuetify-cell {
   background-color: #f9f9f9;
 }
 
-.striped-row .merged-cell-custom {
-  background-color: #f5f5f5 !important;
+.vuetify-custom-table.striped tbody tr:nth-child(odd) .merged-cell-custom {
+  background-color: #f0f0f0 !important;
+}
+
+/* 手动斑马纹控制（通过striped-row类） */
+.vuetify-custom-table.striped .striped-row .vuetify-cell {
+  background-color: #f9f9f9;
+}
+
+.vuetify-custom-table.striped .striped-row .merged-cell-custom {
+  background-color: #f0f0f0 !important;
 }
 
 /* 悬停效果 */

@@ -4,12 +4,49 @@
     <header class="app-header">
       <div class="header-container">
         <div class="brand">
-          <el-icon class="brand-icon" size="24">
-            <Grid />
-          </el-icon>
+          <div class="brand-icon" size="24">
+            <!-- 自定义SVG Logo -->
+            <svg viewBox="0 0 32 32" width="24" height="24" class="table-merger-logo">
+              <!-- 表格框架 -->
+              <rect x="4" y="6" width="24" height="20" rx="2" ry="2" 
+                    fill="none" stroke="#3b82f6" stroke-width="1.5">
+                <animate attributeName="stroke-opacity" values="0.8;1;0.8" dur="3s" repeatCount="indefinite"/>
+              </rect>
+              
+              <!-- 表格分隔线 -->
+              <line x1="4" y1="12" x2="28" y2="12" stroke="#3b82f6" stroke-width="1"/>
+              <line x1="4" y1="18" x2="28" y2="18" stroke="#3b82f6" stroke-width="1"/>
+              <line x1="12" y1="6" x2="12" y2="26" stroke="#3b82f6" stroke-width="1"/>
+              <line x1="20" y1="6" x2="20" y2="26" stroke="#3b82f6" stroke-width="1"/>
+              
+              <!-- 合并指示器 -->
+              <rect x="6" y="8" width="4" height="2" rx="1" fill="#10b981" opacity="0.8">
+                <animate attributeName="fill" values="#10b981;#06d6a0;#10b981" dur="2.5s" repeatCount="indefinite"/>
+              </rect>
+              <rect x="22" y="8" width="4" height="2" rx="1" fill="#10b981" opacity="0.8">
+                <animate attributeName="fill" values="#10b981;#06d6a0;#10b981" dur="2.5s" begin="0.5s" repeatCount="indefinite"/>
+              </rect>
+              
+              <!-- 连接线表示合并 -->
+              <path d="M8 9 Q16 4 24 9" stroke="#f59e0b" stroke-width="2" 
+                    fill="none" stroke-linecap="round">
+                <animate attributeName="stroke-dasharray" values="0,50;20,30;0,50" dur="4s" repeatCount="indefinite"/>
+              </path>
+              
+              <!-- 动态效果点 -->
+              <circle cx="8" cy="9" r="1.5" fill="#f59e0b">
+                <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="1.5;2;1.5" dur="2s" repeatCount="indefinite"/>
+              </circle>
+              <circle cx="24" cy="9" r="1.5" fill="#f59e0b">
+                <animate attributeName="opacity" values="0.3;1;0.3" dur="2s" repeatCount="indefinite"/>
+                <animate attributeName="r" values="1.5;2;1.5" dur="2s" begin="1s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+          </div>
           <div class="brand-text">
-            <h1>Table Span Configurator</h1>
-            <span class="tagline">智能表格合并配置工具</span>
+            <h1>TableWiz</h1>
+            <span class="tagline">表格魔法师 · 让合并变得简单</span>
           </div>
         </div>
       </div>
@@ -85,7 +122,7 @@
 
 <script>
 import { ref, computed } from 'vue'
-import { Grid, View, Document, Menu } from '@element-plus/icons-vue'
+import { View, Document, Menu } from '@element-plus/icons-vue'
 import ConfigPanel from './components/ConfigPanel.vue'
 import UniversalTablePreview from './components/UniversalTablePreview.vue'
 import CodeGenerator from './components/CodeGenerator.vue'
@@ -100,7 +137,6 @@ export default {
     UniversalTablePreview,
     CodeGenerator,
     UILibrarySelector,
-    Grid,
     View,
     Document,
     Menu
@@ -366,7 +402,31 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
 }
 
 .brand-icon {
-  color: #3b82f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);
+  transition: all 0.3s ease;
+}
+
+.brand-icon:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(59, 130, 246, 0.2);
+}
+
+.table-merger-logo {
+  width: 24px;
+  height: 24px;
+  transition: all 0.3s ease;
+}
+
+.brand-icon:hover .table-merger-logo {
+  transform: scale(1.05);
 }
 
 .brand-text h1 {
