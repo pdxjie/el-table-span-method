@@ -457,7 +457,6 @@ export default {
 .ui-library-selector {
   background: #ffffff;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
   padding: 20px;
   margin-bottom: 16px;
 }

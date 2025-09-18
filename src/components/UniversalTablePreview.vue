@@ -219,10 +219,13 @@ export default {
       switch (props.currentLibrary) {
         case 'ant-design-vue':
           return {
-            dataSource: processedTableData.value,
+            dataSource: props.tableData, // 使用原始数据，不需要预处理
             columns: antdColumns.value,
-            bordered: props.spanConfig.showBorder,
-            size: 'small'
+            bordered: props.spanConfig.showBorder !== false,
+            size: 'middle',
+            pagination: false,
+            scroll: { x: 'max-content' },
+            rowKey: (record, index) => index
           }
         case 'naive-ui':
           return {
@@ -312,18 +315,24 @@ export default {
       return names[libraryId] || libraryId
     }
 
-    // 获取处理后的表格数据 - 每个UI库独立处理
+    // 获取处理后的表格数据 - 使用适配器统一处理
     const processedTableData = computed(() => {
       if (!props.tableData || props.tableData.length === 0) {
         return []
       }
       
       try {
-        // 根据当前UI库类型进行不同的数据处理
+        // 使用UILibraryManager统一处理数据，但Ant Design Vue不需要预处理
+        const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
+        if (adapter && typeof adapter.processTableData === 'function' && props.currentLibrary !== 'ant-design-vue') {
+          return adapter.processTableData(props.tableData, props.spanConfig)
+        }
+        
+        // 降级处理：根据当前UI库类型进行不同的数据处理
         switch (props.currentLibrary) {
           case 'ant-design-vue':
-            // Ant Design Vue 需要预处理数据添加合并信息
-            return processAntdData(props.tableData, props.spanConfig)
+            // Ant Design Vue 按照官方文档，不需要预处理数据
+            return props.tableData
           
           case 'vuetify':
             // Vuetify 需要添加合并元数据
@@ -345,38 +354,80 @@ export default {
       }
     })
 
-    // Ant Design Vue 数据处理函数
+    // Ant Design Vue 数据处理函数 - 修复列错位问题
     const processAntdData = (tableData, spanConfig) => {
       if (!spanConfig || !spanConfig.mergeColumns || spanConfig.mergeColumns.length === 0) {
-        return tableData
+        return tableData.map((row, index) => ({ ...row, _originalIndex: index }))
       }
       
       const processedData = []
-      const { mergeColumns, mergeCondition = 'same', customRule } = spanConfig
+      const { mergeColumns, mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('processAntdData - 开始处理数据:', {
+          dataLength: tableData.length,
+          mergeColumns,
+          startRow,
+          endRow
+        })
+      }
       
       for (let i = 0; i < tableData.length; i++) {
-        const row = { ...tableData[i] }
+        const row = { ...tableData[i], _originalIndex: i }
         
-        mergeColumns.forEach(column => {
-          const spanInfo = calculateAntdSpan(tableData, i, column, mergeCondition, customRule)
-          row[`${column}_rowSpan`] = spanInfo.rowSpan
-          row[`${column}_colSpan`] = spanInfo.colSpan
+        // 初始化所有列的合并信息
+        const fields = Object.keys(tableData[i])
+        fields.forEach(field => {
+          if (!mergeColumns.includes(field)) {
+            // 非合并列默认不合并
+            row[`${field}_rowSpan`] = 1
+            row[`${field}_colSpan`] = 1
+          }
         })
         
+        // 检查是否在合并范围内
+        if (i >= startRow && (endRow === undefined || i <= endRow)) {
+          mergeColumns.forEach(column => {
+            const spanInfo = calculateAntdSpan(tableData, i, column, mergeCondition, customRule, startRow, endRow)
+            row[`${column}_rowSpan`] = spanInfo.rowSpan
+            row[`${column}_colSpan`] = spanInfo.colSpan
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`处理行 ${i}, 列 ${column}:`, spanInfo)
+            }
+          })
+        } else {
+          // 不在合并范围内的行，设置默认值
+          mergeColumns.forEach(column => {
+            row[`${column}_rowSpan`] = 1
+            row[`${column}_colSpan`] = 1
+          })
+        }
+        
         processedData.push(row)
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('processAntdData - 处理完成:', processedData)
       }
       
       return processedData
     }
     
-    // Ant Design Vue 合并计算
-    const calculateAntdSpan = (data, rowIndex, column, mergeCondition, customRule) => {
+    // Ant Design Vue 合并计算 - 降级备用
+    const calculateAntdSpan = (data, rowIndex, column, mergeCondition, customRule, startRow = 0, endRow) => {
       const currentValue = data[rowIndex][column]
       let rowSpan = 1
       let colSpan = 1
+      
+      // 检查是否在合并范围内
+      if (rowIndex < startRow || (endRow !== undefined && rowIndex > endRow)) {
+        return { rowSpan: 1, colSpan: 1 }
+      }
 
-      // 计算行合并
-      for (let i = rowIndex + 1; i < data.length; i++) {
+      // 向下计算行合并 - 只在合并范围内
+      const maxIndex = endRow !== undefined ? Math.min(endRow, data.length - 1) : data.length - 1
+      for (let i = rowIndex + 1; i <= maxIndex; i++) {
         if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
           rowSpan++
         } else {
@@ -384,8 +435,8 @@ export default {
         }
       }
 
-      // 检查是否为合并区域的第一行
-      for (let i = rowIndex - 1; i >= 0; i--) {
+      // 检查是否为合并区域的第一行 - 只在合并范围内检查
+      for (let i = rowIndex - 1; i >= startRow; i--) {
         if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
           return { rowSpan: 0, colSpan: 0 }
         } else {
@@ -500,18 +551,91 @@ export default {
       return { rowspan, shouldRender }
     }
 
-    // 通用合并条件判断函数
+    // 通用合并条件判断函数 - 增强错误处理
     const shouldMergeValues = (value1, value2, mergeCondition, customRule) => {
-      if (mergeCondition === 'custom' && customRule) {
-        try {
-          const mergeFunction = new Function('value1', 'value2', `return ${customRule}`)
+      try {
+        if (mergeCondition === 'custom' && customRule) {
+          // 使用更安全的方式执行自定义规则
+          const mergeFunction = new Function('value1', 'value2', `
+            try {
+              return ${customRule}
+            } catch (e) {
+              console.error('Custom rule execution error:', e)
+              return value1 === value2
+            }
+          `)
           return mergeFunction(value1, value2)
-        } catch (error) {
-          console.error('自定义规则执行错误:', error)
-          return value1 === value2
         }
+        
+        // 默认情况下使用严格等于比较
+        return value1 === value2
+      } catch (error) {
+        console.error('合并条件判断出错:', error)
+        return value1 === value2
       }
-      return value1 === value2
+    }
+
+    // Ant Design Vue 合并计算函数 - 按照官方文档实现
+    const calculateAntdCellSpan = (tableData, rowIndex, field, spanConfig) => {
+      const { mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = spanConfig
+      const currentValue = tableData[rowIndex][field]
+      
+      if (mergeType === 'row') {
+        // 行合并逻辑
+        let rowSpan = 1
+        let colSpan = 1
+        
+        // 向下查找相同值
+        const maxIndex = endRow !== undefined ? Math.min(endRow, tableData.length - 1) : tableData.length - 1
+        for (let i = rowIndex + 1; i <= maxIndex; i++) {
+          if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+            rowSpan++
+          } else {
+            break
+          }
+        }
+        
+        // 检查是否为合并区域的第一行
+        for (let i = rowIndex - 1; i >= startRow; i--) {
+          if (shouldMergeAntdValues(tableData[i][field], currentValue, mergeCondition, customRule)) {
+            // 不是第一行，隐藏这个单元格
+            return { rowSpan: 0, colSpan: 0 }
+          } else {
+            break
+          }
+        }
+        
+        return { rowSpan, colSpan }
+      } else if (mergeType === 'column') {
+        // 列合并逻辑 - Ant Design Vue 支持有限
+        return { rowSpan: 1, colSpan: 1 }
+      } else if (mergeType === 'mixed') {
+        // 混合合并 - 降级为行合并
+        return calculateAntdCellSpan(tableData, rowIndex, field, { ...spanConfig, mergeType: 'row' })
+      }
+      
+      return { rowSpan: 1, colSpan: 1 }
+    }
+    
+    // Ant Design Vue 合并条件判断
+    const shouldMergeAntdValues = (value1, value2, mergeCondition, customRule) => {
+      try {
+        if (mergeCondition === 'custom' && customRule) {
+          const mergeFunction = new Function('value1', 'value2', `
+            try {
+              return ${customRule}
+            } catch (e) {
+              console.error('Custom rule execution error:', e)
+              return value1 === value2
+            }
+          `)
+          return mergeFunction(value1, value2)
+        }
+        return value1 === value2
+      } catch (error) {
+        console.error('Ant Design Vue 合并条件判断出错:', error)
+        return value1 === value2
+      }
     }
 
     // Element Plus span-method
@@ -610,22 +734,34 @@ export default {
       return value1 === value2
     }
 
-    // Ant Design Vue 列配置
+    // Ant Design Vue 列配置 - 按照官方文档实现
     const antdColumns = computed(() => {
       if (props.tableData.length === 0) return []
       
       const fields = Object.keys(props.tableData[0])
-      const { mergeColumns = [] } = props.spanConfig || {}
+      const { mergeColumns = [], mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
       
       return fields.map(field => ({
         title: field,
         dataIndex: field,
         key: field,
-        customCell: mergeColumns.includes(field) ? (record) => {
-          const rowSpan = record[`${field}_rowSpan`] || 1
-          const colSpan = record[`${field}_colSpan`] || 1
-          return { rowSpan, colSpan }
-        } : undefined
+        width: getColumnMinWidth(field),
+        // 按照官方文档，使用customCell函数
+        customCell: (record, index) => {
+          // 只对需要合并的列进行处理
+          if (!mergeColumns.includes(field)) {
+            return { rowSpan: 1, colSpan: 1 }
+          }
+          
+          // 检查是否在合并范围内
+          if (index < startRow || (endRow !== undefined && index > endRow)) {
+            return { rowSpan: 1, colSpan: 1 }
+          }
+          
+          return calculateAntdCellSpan(props.tableData, index, field, props.spanConfig)
+        },
+        ellipsis: true,
+        showSorterTooltip: false
       }))
     })
 

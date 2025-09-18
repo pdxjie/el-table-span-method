@@ -246,6 +246,18 @@ export class AntdAdapter extends UILibraryAdapter {
     }
   }
 
+  getFeatures() {
+    return {
+      rowSpan: true,
+      colSpan: false, // Ant Design Vue 对列合并支持有限
+      mixedSpan: false, // 混合合并会降级为行合并
+      customRender: true,
+      virtualScroll: false,
+      sortable: true,
+      resizable: false
+    }
+  }
+
   generateSpanMethod(config) {
     const { mergeType, mergeColumns, mergeCondition, customRule } = config
     
@@ -319,15 +331,15 @@ const getRowSpanColSpan = (record, column) => {
 
   generateVue3Code(config) {
     const { mergeColumns, showBorder, stripe } = config
-    const spanMethodCode = this.generateSpanMethod(config)
 
     return `<template>
   <div class="table-container">
     <a-table
-      :data-source="processedTableData"
-      :columns="tableColumns"
-      :bordered="${showBorder || true}"
-      :stripe="${stripe || false}"
+      :data-source="tableData"
+      :columns="columns"
+      :bordered="${showBorder !== false}"
+      size="middle"
+      :pagination="false"
       :scroll="{ x: 'max-content' }"
     />
   </div>
@@ -340,13 +352,7 @@ const tableData = ref([
   // 在这里添加你的数据
 ])
 
-${spanMethodCode}
-
-const processedTableData = computed(() => {
-  return processDataForMerge(tableData.value)
-})
-
-const tableColumns = computed(() => {
+const columns = computed(() => {
   if (tableData.value.length === 0) return []
   
   const fields = Object.keys(tableData.value[0])
@@ -356,12 +362,46 @@ const tableColumns = computed(() => {
     title: field,
     dataIndex: field,
     key: field,
-    customCell: mergeColumns.includes(field) ? (record) => {
-      const { rowSpan, colSpan } = getRowSpanColSpan(record, field)
-      return { rowSpan, colSpan }
-    } : undefined
+    customCell: (record, index) => {
+      // 只对需要合并的列进行处理
+      if (!mergeColumns.includes(field)) {
+        return { rowSpan: 1, colSpan: 1 }
+      }
+      
+      return calculateCellSpan(tableData.value, index, field)
+    }
   }))
 })
+
+const calculateCellSpan = (data, rowIndex, field) => {
+  const currentValue = data[rowIndex][field]
+  let rowSpan = 1
+  
+  // 向下查找相同值
+  for (let i = rowIndex + 1; i < data.length; i++) {
+    if (shouldMerge(data[i][field], currentValue)) {
+      rowSpan++
+    } else {
+      break
+    }
+  }
+  
+  // 检查是否为合并区域的第一行
+  for (let i = rowIndex - 1; i >= 0; i--) {
+    if (shouldMerge(data[i][field], currentValue)) {
+      // 不是第一行，隐藏这个单元格
+      return { rowSpan: 0, colSpan: 0 }
+    } else {
+      break
+    }
+  }
+  
+  return { rowSpan, colSpan: 1 }
+}
+
+const shouldMerge = (value1, value2) => {
+  return value1 === value2
+}
 </script>
 
 <style scoped>
@@ -444,32 +484,25 @@ export default {
   }
 
   processTableData(tableData, config) {
-    // Ant Design Vue 需要预处理数据来添加合并信息
-    const processedData = []
-    const { mergeColumns } = config
-    
-    for (let i = 0; i < tableData.length; i++) {
-      const row = { ...tableData[i] }
-      
-      mergeColumns.forEach(column => {
-        const spanInfo = this.calculateSpanForRow(tableData, i, column, config)
-        row[`${column}_rowSpan`] = spanInfo.rowSpan
-        row[`${column}_colSpan`] = spanInfo.colSpan
-      })
-      
-      processedData.push(row)
-    }
-    
-    return processedData
+    // Ant Design Vue 按照官方文档，不需要预处理数据
+    // customCell 函数会直接在渲染时计算合并信息
+    return tableData
   }
 
   calculateSpanForRow(data, rowIndex, column, config) {
+    const { mergeCondition = 'same', customRule, startRow = 0, endRow } = config
     const currentValue = data[rowIndex][column]
     let rowSpan = 1
     let colSpan = 1
+    
+    // 检查是否在合并范围内
+    if (rowIndex < startRow || (endRow !== undefined && rowIndex > endRow)) {
+      return { rowSpan: 1, colSpan: 1 }
+    }
 
-    // 计算行合并
-    for (let i = rowIndex + 1; i < data.length; i++) {
+    // 向下计算行合并 - 只在合并范围内
+    const maxIndex = endRow !== undefined ? Math.min(endRow, data.length - 1) : data.length - 1
+    for (let i = rowIndex + 1; i <= maxIndex; i++) {
       if (this.shouldMergeValues(data[i][column], currentValue, config)) {
         rowSpan++
       } else {
@@ -477,8 +510,8 @@ export default {
       }
     }
 
-    // 检查是否为合并区域的第一行
-    for (let i = rowIndex - 1; i >= 0; i--) {
+    // 检查是否为合并区域的第一行 - 只在合并范围内检查
+    for (let i = rowIndex - 1; i >= startRow; i--) {
       if (this.shouldMergeValues(data[i][column], currentValue, config)) {
         return { rowSpan: 0, colSpan: 0 }
       } else {
@@ -506,6 +539,46 @@ export default {
     
     return value1 === value2
   }
+  
+  // 只计算行合并
+  calculateRowSpanOnly(data, rowIndex, column, config) {
+    const { startRow = 0, endRow } = config
+    const currentValue = data[rowIndex][column]
+    let rowSpan = 1
+    
+    // 向下计算行合并 - 只在合并范围内
+    const maxIndex = endRow !== undefined ? Math.min(endRow, data.length - 1) : data.length - 1
+    for (let i = rowIndex + 1; i <= maxIndex; i++) {
+      if (this.shouldMergeValues(data[i][column], currentValue, config)) {
+        rowSpan++
+      } else {
+        break
+      }
+    }
+
+    // 检查是否为合并区域的第一行 - 只在合并范围内检查
+    for (let i = rowIndex - 1; i >= startRow; i--) {
+      if (this.shouldMergeValues(data[i][column], currentValue, config)) {
+        return { rowSpan: 0, colSpan: 0 }
+      } else {
+        break
+      }
+    }
+
+    return { rowSpan, colSpan: 1 }
+  }
+  
+  // 只计算列合并 - Ant Design Vue 不直接支持列合并，需要特殊处理
+  calculateColSpanOnly(data, rowIndex, column, config) {
+    // Ant Design Vue 对列合并的支持有限，返回默认值
+    return { rowSpan: 1, colSpan: 1 }
+  }
+  
+  // 混合合并 - Ant Design Vue 不支持真正的混合合并，降级为行合并
+  calculateMixedSpan(data, rowIndex, column, config) {
+    // 由于Ant Design Vue的限制，混合合并降级为行合并
+    return this.calculateRowSpanOnly(data, rowIndex, column, config)
+  }
 
   getInstallCommands() {
     return {
@@ -527,12 +600,18 @@ export default {
       notes: [
         'Ant Design Vue 使用 customCell 返回 rowSpan 和 colSpan',
         '需要预处理数据计算合并信息',
-        'rowSpan/colSpan 为 0 时隐藏单元格'
+        'rowSpan/colSpan 为 0 时隐藏单元格',
+        '⚠️ 列合并功能在Ant Design Vue中支持有限',
+        '⚠️ 混合合并会降级为行合并处理'
       ],
       links: [
         {
           title: 'Ant Design Vue 表格文档',
           url: 'https://antdv.com/components/table-cn#API'
+        },
+        {
+          title: '表格合并单元格示例',
+          url: 'https://antdv.com/components/table-cn#components-table-demo-colspan-rowspan'
         }
       ]
     }
