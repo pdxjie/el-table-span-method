@@ -128,7 +128,7 @@
     </div>
 
     <!-- 合并信息提示 -->
-    <div class="merge-info" v-if="tableData.length > 0 && spanConfig.mergeColumns.length > 0">
+    <div class="merge-info" v-if="tableData.length > 0 && spanConfig.mergeColumns && spanConfig.mergeColumns.length > 0">
       <div class="info-item">
         <el-tag size="small" type="success">
           {{ getMergeTypeText() }}
@@ -221,14 +221,14 @@ export default {
           return {
             dataSource: processedTableData.value,
             columns: antdColumns.value,
-            bordered: spanConfig.showBorder,
+            bordered: props.spanConfig.showBorder,
             size: 'small'
           }
         case 'naive-ui':
           return {
             data: processedTableData.value,
             columns: naiveColumns.value,
-            bordered: spanConfig.showBorder,
+            bordered: props.spanConfig.showBorder,
             size: 'small',
             'single-line': false
           }
@@ -245,7 +245,7 @@ export default {
             columns: quasarColumns.value,
             rowKey: 'id',
             flat: true,
-            bordered: spanConfig.showBorder
+            bordered: props.spanConfig.showBorder
           }
         default:
           return {}
@@ -312,19 +312,207 @@ export default {
       return names[libraryId] || libraryId
     }
 
-    // 获取处理后的表格数据
+    // 获取处理后的表格数据 - 每个UI库独立处理
     const processedTableData = computed(() => {
+      if (!props.tableData || props.tableData.length === 0) {
+        return []
+      }
+      
       try {
-        const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
-        if (adapter && adapter.processTableData) {
-          return adapter.processTableData(props.tableData, props.spanConfig)
+        // 根据当前UI库类型进行不同的数据处理
+        switch (props.currentLibrary) {
+          case 'ant-design-vue':
+            // Ant Design Vue 需要预处理数据添加合并信息
+            return processAntdData(props.tableData, props.spanConfig)
+          
+          case 'vuetify':
+            // Vuetify 需要添加合并元数据
+            return processVuetifyData(props.tableData, props.spanConfig)
+          
+          case 'quasar':
+            // Quasar 需要添加合并信息
+            return processQuasarData(props.tableData, props.spanConfig)
+          
+          case 'naive-ui':
+          case 'element-plus':
+          default:
+            // Naive UI 和 Element Plus 使用原始数据
+            return props.tableData
         }
-        return props.tableData
       } catch (error) {
         console.error('处理表格数据时出错:', error)
         return props.tableData
       }
     })
+
+    // Ant Design Vue 数据处理函数
+    const processAntdData = (tableData, spanConfig) => {
+      if (!spanConfig || !spanConfig.mergeColumns || spanConfig.mergeColumns.length === 0) {
+        return tableData
+      }
+      
+      const processedData = []
+      const { mergeColumns, mergeCondition = 'same', customRule } = spanConfig
+      
+      for (let i = 0; i < tableData.length; i++) {
+        const row = { ...tableData[i] }
+        
+        mergeColumns.forEach(column => {
+          const spanInfo = calculateAntdSpan(tableData, i, column, mergeCondition, customRule)
+          row[`${column}_rowSpan`] = spanInfo.rowSpan
+          row[`${column}_colSpan`] = spanInfo.colSpan
+        })
+        
+        processedData.push(row)
+      }
+      
+      return processedData
+    }
+    
+    // Ant Design Vue 合并计算
+    const calculateAntdSpan = (data, rowIndex, column, mergeCondition, customRule) => {
+      const currentValue = data[rowIndex][column]
+      let rowSpan = 1
+      let colSpan = 1
+
+      // 计算行合并
+      for (let i = rowIndex + 1; i < data.length; i++) {
+        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowSpan, colSpan }
+    }
+
+    // Vuetify 数据处理函数
+    const processVuetifyData = (tableData, spanConfig) => {
+      if (!spanConfig || !spanConfig.mergeColumns || spanConfig.mergeColumns.length === 0) {
+        return tableData
+      }
+      
+      const processedData = []
+      const { mergeColumns, mergeCondition = 'same', customRule } = spanConfig
+      
+      for (let i = 0; i < tableData.length; i++) {
+        const row = { ...tableData[i] }
+        
+        mergeColumns.forEach(column => {
+          const spanInfo = calculateVuetifySpan(tableData, i, column, mergeCondition, customRule)
+          row._merge = row._merge || {}
+          row._merge[column] = spanInfo
+        })
+        
+        processedData.push(row)
+      }
+      
+      return processedData
+    }
+    
+    // Vuetify 合并计算
+    const calculateVuetifySpan = (data, rowIndex, column, mergeCondition, customRule) => {
+      const currentValue = data[rowIndex][column]
+      let rowspan = 1
+      let shouldShow = true
+
+      // 计算行合并数量
+      for (let i = rowIndex + 1; i < data.length; i++) {
+        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否应该隐藏（不是合并的第一行）
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
+          shouldShow = false
+          break
+        } else {
+          break
+        }
+      }
+
+      return { rowspan, shouldShow }
+    }
+
+    // Quasar 数据处理函数
+    const processQuasarData = (tableData, spanConfig) => {
+      if (!spanConfig || !spanConfig.mergeColumns || spanConfig.mergeColumns.length === 0) {
+        return tableData
+      }
+      
+      const processedData = []
+      const { mergeColumns, mergeCondition = 'same', customRule } = spanConfig
+      
+      for (let i = 0; i < tableData.length; i++) {
+        const row = { ...tableData[i] }
+        
+        mergeColumns.forEach(column => {
+          const mergeInfo = calculateQuasarSpan(tableData, i, column, mergeCondition, customRule)
+          row._cellMerge = row._cellMerge || {}
+          row._cellMerge[column] = mergeInfo
+        })
+        
+        processedData.push(row)
+      }
+      
+      return processedData
+    }
+    
+    // Quasar 合并计算
+    const calculateQuasarSpan = (data, rowIndex, column, mergeCondition, customRule) => {
+      const currentValue = data[rowIndex][column]
+      let rowspan = 1
+      let shouldRender = true
+
+      // 向下查找相同值
+      for (let i = rowIndex + 1; i < data.length; i++) {
+        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否为合并区域的首行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (shouldMergeValues(data[i][column], currentValue, mergeCondition, customRule)) {
+          shouldRender = false
+          break
+        } else {
+          break
+        }
+      }
+
+      return { rowspan, shouldRender }
+    }
+
+    // 通用合并条件判断函数
+    const shouldMergeValues = (value1, value2, mergeCondition, customRule) => {
+      if (mergeCondition === 'custom' && customRule) {
+        try {
+          const mergeFunction = new Function('value1', 'value2', `return ${customRule}`)
+          return mergeFunction(value1, value2)
+        } catch (error) {
+          console.error('自定义规则执行错误:', error)
+          return value1 === value2
+        }
+      }
+      return value1 === value2
+    }
 
     // Element Plus span-method
     const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
