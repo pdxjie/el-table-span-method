@@ -1,74 +1,88 @@
 <template>
   <div class="ui-library-selector">
-    <!-- 简洁的UI库选择栏 -->
-    <div class="selector-container">
-      <div class="selector-info">
-        <el-icon class="selector-icon"><Setting /></el-icon>
-        <span class="selector-label">UI组件库:</span>
-      </div>
-      
-      <!-- 下拉选择器 -->
-      <el-select 
-        :model-value="currentLibrary"
-        @change="selectLibrary"
-        placeholder="选择UI库"
-        class="library-select"
-        size="default"
-      >
-        <el-option
-          v-for="library in availableLibraries"
-          :key="library.id"
-          :label="library.name"
-          :value="library.id"
-        >
-          <div class="option-content">
-            <div class="option-main">
-              <span class="option-name">{{ library.name }}</span>
-              <span class="option-version">v{{ library.version }}</span>
-              <el-tag 
-                size="small" 
-                :type="getPopularityType(getLibraryMeta(library.id).popularity)"
-                class="option-tag"
-              >
-                {{ getLibraryMeta(library.id).popularity }}
-              </el-tag>
-            </div>
-            <div class="option-features">
-              <el-icon v-if="library.features.rowSpan" class="feature-icon"><Grid /></el-icon>
-              <el-icon v-if="library.features.colSpan" class="feature-icon"><Promotion /></el-icon>
-              <el-icon v-if="library.features.customRender" class="feature-icon"><Edit /></el-icon>
-              <el-icon v-if="library.features.virtualScroll" class="feature-icon"><Rank /></el-icon>
+    <!-- 简洁的分段控制器 -->
+    <div class="selector-main">
+      <div class="selector-header">
+        <div class="switcher-container">
+          <div class="library-switcher">
+            <div 
+              v-for="library in availableLibraries" 
+              :key="library.id"
+              class="library-tab"
+              :class="{ 'active': library.id === currentLibrary }"
+              @click="selectLibrary(library.id)"
+              :title="library.name"
+            >
+              <div class="tab-icon" :class="`icon-${library.id}`">
+                <el-icon v-if="library.id === 'element-plus'"><Grid /></el-icon>
+                <el-icon v-else-if="library.id === 'ant-design-vue'"><Operation /></el-icon>
+                <el-icon v-else-if="library.id === 'naive-ui'"><Rank /></el-icon>
+                <el-icon v-else-if="library.id === 'vuetify'"><Promotion /></el-icon>
+              </div>
+              <span class="tab-label">{{ getLibraryShortName(library.id) }}</span>
+              <div v-if="library.id === currentLibrary" class="active-indicator"></div>
             </div>
           </div>
-        </el-option>
-      </el-select>
-      
-      <!-- 快速操作按钮 -->
-      <div class="quick-actions">
-        <el-button 
-          size="small" 
-          type="text" 
-          @click="viewCurrentLibraryDocs"
-          title="查看文档"
-        >
-         <el-icon><Document /></el-icon>
-        </el-button>
-        <el-button 
-          size="small" 
-          type="text" 
-          @click="showInstallInfo = !showInstallInfo"
-          :title="showInstallInfo ? '隐藏安装说明' : '查看安装说明'"
-        >
-        <el-icon><Download /></el-icon>
-      </el-button>
+        </div>
       </div>
+      
+      <!-- 当前库简要信息 -->
+      <el-collapse-transition>
+        <div v-if="showQuickInfo" class="quick-info">
+          <div class="current-library-info">
+            <div class="info-main">
+              <div class="lib-identity">
+                <div class="lib-icon" :class="`icon-${currentLibrary}`">
+                  <el-icon v-if="currentLibrary === 'element-plus'"><Grid /></el-icon>
+                  <el-icon v-else-if="currentLibrary === 'ant-design-vue'"><Operation /></el-icon>
+                  <el-icon v-else-if="currentLibrary === 'naive-ui'"><Rank /></el-icon>
+                  <el-icon v-else-if="currentLibrary === 'vuetify'"><Promotion /></el-icon>
+                </div>
+                <div class="lib-details">
+                  <h4 class="lib-name">{{ currentLibraryInfo.name }}</h4>
+                  <span class="lib-version">v{{ currentLibraryInfo.version }}</span>
+                </div>
+              </div>
+              
+              <div class="features-compact">
+                <el-tag v-if="currentLibraryInfo.features.rowSpan" size="small" type="primary">行合并</el-tag>
+                <el-tag v-if="currentLibraryInfo.features.colSpan" size="small" type="success">列合并</el-tag>
+                <el-tag v-if="currentLibraryInfo.features.mixedSpan" size="small" type="warning">混合合并</el-tag>
+              </div>
+            </div>
+            
+            <div class="info-actions">
+              <el-button 
+                size="small" 
+                type="text" 
+                @click="viewCurrentLibraryDocs"
+                title="查看文档"
+              >
+                <el-icon><Document /></el-icon>
+              </el-button>
+              <el-button 
+                size="small" 
+                type="text" 
+                @click="showInstallDialog = true"
+                title="安装说明"
+              >
+                <el-icon><Download /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </div>
+      </el-collapse-transition>
     </div>
 
-    <!-- 折叠式安装信息 -->
-    <el-collapse-transition>
-      <div v-show="showInstallInfo" class="install-panel">
-        <div class="install-header">
-          <h6>安装 {{ currentLibraryInfo.name }}</h6>
+    <!-- 安装对话框 -->
+    <el-dialog
+      v-model="showInstallDialog"
+      :title="`安装 ${currentLibraryInfo?.name}`"
+      width="480px"
+    >
+      <div class="install-content">
+        <div class="package-manager-select">
+          <span class="label">包管理器:</span>
           <el-radio-group v-model="selectedPackageManager" size="small">
             <el-radio-button value="npm">npm</el-radio-button>
             <el-radio-button value="yarn">yarn</el-radio-button>
@@ -76,27 +90,26 @@
           </el-radio-group>
         </div>
         
-        <div class="command-display">
-          <code>{{ installCommands[selectedPackageManager] }}</code>
-          <el-button 
-            size="small" 
-            type="text" 
-            @click="copyInstallCommand"
-            title="复制命令"
-          >
-            <el-icon><CopyDocument /></el-icon>
-          </el-button>
+        <div class="command-section">
+          <div class="command-display">
+            <code>{{ getInstallCommand() }}</code>
+            <el-button 
+              size="small" 
+              type="text" 
+              @click="copyInstallCommand"
+              title="复制命令"
+            >
+              <el-icon><CopyDocument /></el-icon>
+            </el-button>
+          </div>
         </div>
         
-        <!-- 特性信息 -->
-        <div class="feature-info" v-if="hasLimitedFeatures">
-          <el-icon class="warning-icon"><Warning /></el-icon>
-          <span class="warning-text">
-            注意：{{ currentLibraryInfo.name }} 对某些合并功能支持有限
-          </span>
+        <div class="feature-notice" v-if="hasFeatureLimitations()">
+          <el-icon class="notice-icon"><Warning /></el-icon>
+          <span class="notice-text">{{ getFeatureLimitationText() }}</span>
         </div>
       </div>
-    </el-collapse-transition>
+    </el-dialog>
 
     <!-- 文档对话框 -->
     <el-dialog
@@ -134,16 +147,16 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { 
-  Setting, Grid, Document, Download, Search, Check, Close, 
-  CopyDocument, Link, Edit, Rank, Promotion, Operation, Warning 
+  Setting, Grid, Document, Download, Close, InfoFilled,
+  CopyDocument, Link, Rank, Promotion, Operation, Warning 
 } from '@element-plus/icons-vue'
 import { uiLibraryManager, UI_LIBRARY_METADATA } from '../adapters/UILibraryManager.js'
 
 export default {
   name: 'UILibrarySelector',
   components: {
-    Setting, Grid, Document, Download, Search, Check, Close,
-    CopyDocument, Link, Edit, Rank, Promotion, Operation, Warning
+    Setting, Grid, Document, Download, Close, InfoFilled,
+    CopyDocument, Link, Rank, Promotion, Operation, Warning
   },
   props: {
     currentLibrary: {
@@ -154,7 +167,8 @@ export default {
   emits: ['library-change'],
   setup(props, { emit }) {
     const showDocModal = ref(false)
-    const showInstallInfo = ref(false)
+    const showQuickInfo = ref(false)
+    const showInstallDialog = ref(false)
     const selectedPackageManager = ref('npm')
     const selectedDocLibrary = ref(null)
 
@@ -174,16 +188,21 @@ export default {
     })
 
     // 安装命令
-    const installCommands = computed(() => {
+    const getInstallCommand = () => {
       const instructions = uiLibraryManager.getInstallInstructions(props.currentLibrary)
-      return instructions.commands
-    })
+      return instructions.commands[selectedPackageManager.value] || ''
+    }
 
-    // 导入语句
-    const importStatements = computed(() => {
-      const instructions = uiLibraryManager.getInstallInstructions(props.currentLibrary)
-      return instructions.imports
-    })
+    // 获取UI库短名称
+    const getLibraryShortName = (libraryId) => {
+      const names = {
+        'element-plus': 'Element+',
+        'ant-design-vue': 'Antd',
+        'naive-ui': 'Naive',
+        'vuetify': 'Vuetify'
+      }
+      return names[libraryId] || libraryId
+    }
 
     // 获取UI库元数据
     const getLibraryMeta = (libraryId) => {
@@ -193,6 +212,16 @@ export default {
         learnability: 'medium',
         ecosystem: 'good'
       }
+    }
+
+    // 获取热度等级（数字）
+    const getPopularityLevel = (popularity) => {
+      const levelMap = {
+        low: 1,
+        medium: 2,
+        high: 3
+      }
+      return levelMap[popularity] || 2
     }
 
     // 获取特性名称
@@ -219,13 +248,13 @@ export default {
       return typeMap[popularity] || 'info'
     }
 
-    // 选择UI库 - 直接生效
+    // 选择UI库
     const selectLibrary = (libraryId) => {
       if (libraryId !== props.currentLibrary) {
         try {
           uiLibraryManager.setCurrentAdapter(libraryId)
           emit('library-change', libraryId)
-          ElMessage.success(`已切换到 ${getLibraryName(libraryId)}`)
+          ElMessage.success(`已切换到 ${getLibraryDisplayName(libraryId)}`)
         } catch (error) {
           ElMessage.error('切换UI库失败: ' + error.message)
         }
@@ -233,27 +262,54 @@ export default {
     }
 
     // 获取UI库名称
-    const getLibraryName = (libraryId) => {
+    const getLibraryDisplayName = (libraryId) => {
       const library = availableLibraries.value.find(lib => lib.id === libraryId)
       return library ? library.name : libraryId
     }
 
-    // 查看当前库文档
-    const viewCurrentLibraryDocs = () => {
-      selectedDocLibrary.value = currentLibraryInfo.value
+    // 查看库文档
+    const viewLibraryDocs = (library) => {
+      selectedDocLibrary.value = library
       showDocModal.value = true
     }
 
+    // 查看当前库文档
+    const viewCurrentLibraryDocs = () => {
+      const currentLib = availableLibraries.value.find(lib => lib.id === props.currentLibrary)
+      if (currentLib) {
+        viewLibraryDocs(currentLib)
+      }
+    }
+
     // 检查当前库是否有功能限制
-    const hasLimitedFeatures = computed(() => {
-      const meta = currentLibraryMeta.value
-      return meta.limitations && meta.limitations.length > 0
-    })
+    const hasFeatureLimitations = () => {
+      const library = availableLibraries.value.find(lib => lib.id === props.currentLibrary)
+      if (!library) return false
+      
+      // 检查是否有不支持的功能
+      return !library.features.colSpan || !library.features.mixedSpan
+    }
+
+    // 获取功能限制提示文本
+    const getFeatureLimitationText = () => {
+      const library = availableLibraries.value.find(lib => lib.id === props.currentLibrary)
+      if (!library) return ''
+      
+      const limitations = []
+      if (!library.features.colSpan) limitations.push('列合并')
+      if (!library.features.mixedSpan) limitations.push('混合合并')
+      
+      if (limitations.length > 0) {
+        return `注意：${library.name} 对${limitations.join('、')}功能支持有限`
+      }
+      return ''
+    }
 
     // 复制安装命令
     const copyInstallCommand = async () => {
       try {
-        await navigator.clipboard.writeText(installCommands.value[selectedPackageManager.value])
+        const command = getInstallCommand()
+        await navigator.clipboard.writeText(command)
         ElMessage.success('安装命令已复制到剪贴板')
       } catch (error) {
         ElMessage.error('复制失败')
@@ -269,20 +325,24 @@ export default {
 
     return {
       showDocModal,
-      showInstallInfo,
+      showQuickInfo,
+      showInstallDialog,
       selectedPackageManager,
       selectedDocLibrary,
       availableLibraries,
       currentLibraryInfo,
       currentLibraryMeta,
-      installCommands,
-      importStatements,
+      getInstallCommand,
+      getLibraryShortName,
       getLibraryMeta,
+      getPopularityLevel,
       getFeatureName,
       getPopularityType,
       selectLibrary,
+      viewLibraryDocs,
       viewCurrentLibraryDocs,
-      hasLimitedFeatures,
+      hasFeatureLimitations,
+      getFeatureLimitationText,
       copyInstallCommand
     }
   }
@@ -291,185 +351,312 @@ export default {
 
 <style scoped>
 .ui-library-selector {
+  margin-bottom: 20px;
+}
+
+/* 主选择器 */
+.selector-main {
   background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 8px;
+  overflow: hidden;
+}
+
+/* 选择器头部 */
+.selector-header {
+  display: flex;
+  justify-content: center;
   padding: 12px 16px;
+  background: #fafbfc;
+  border-bottom: 1px solid #f0f0f0;
 }
 
-/* 紧凑的选择器容器 */
-.selector-container {
+.switcher-container {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.selector-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.selector-icon {
+.header-icon {
   font-size: 16px;
   color: #6b7280;
 }
 
-.selector-label {
+.header-title {
   font-size: 14px;
-  color: #374151;
   font-weight: 500;
-  white-space: nowrap;
+  color: #374151;
+  margin-right: 16px;
 }
 
-.library-select {
-  min-width: 160px;
-  flex: 0 0 auto;
+/* 库切换器 */
+.library-switcher {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  justify-content: center;
+  max-width: 480px;
 }
 
+.library-tab {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: transparent;
+  flex: 1;
+  min-width: 80px;
+  max-width: 120px;
+}
+
+.library-tab:hover {
+  background: rgba(59, 130, 246, 0.05);
+  transform: translateY(-1px);
+}
+
+.library-tab.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.tab-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: white;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.library-tab.active .tab-icon {
+  transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.icon-element-plus {
+  background: linear-gradient(135deg, #409eff, #337ecc);
+}
+
+.icon-ant-design-vue {
+  background: linear-gradient(135deg, #1890ff, #0050b3);
+}
+
+.icon-naive-ui {
+  background: linear-gradient(135deg, #18a058, #0c7a43);
+}
+
+.icon-vuetify {
+  background: linear-gradient(135deg, #1976d2, #0d47a1);
+}
+
+.tab-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b7280;
+  transition: all 0.3s ease;
+  text-align: center;
+  line-height: 1;
+}
+
+.library-tab.active .tab-label {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.active-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background: #3b82f6;
+  border-radius: 1px;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    width: 0;
+    opacity: 0;
+  }
+  to {
+    width: 20px;
+    opacity: 1;
+  }
+}
+
+/* 快速操作 */
 .quick-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
+  margin-left: 8px;
 }
 
-/* 选项内容样式 */
-.option-content {
+/* 快速信息面板 */
+.quick-info {
+  padding: 16px;
+  background: #ffffff;
+  border-top: 1px solid #f0f0f0;
+}
+
+.current-library-info {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  gap: 8px;
+  gap: 16px;
 }
 
-.option-main {
+.info-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 16px;
   flex: 1;
 }
 
-.option-name {
-  font-weight: 500;
-  color: #111827;
-}
-
-.option-version {
-  font-size: 11px;
-  color: #6b7280;
-  background: #f3f4f6;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: monospace;
-}
-
-.option-tag {
-  margin-left: 4px;
-}
-
-.option-features {
-  display: flex;
-  gap: 4px;
-  opacity: 0.7;
-}
-
-.feature-icon {
-  font-size: 14px;
-  color: #16a34a;
-}
-
-/* 安装面板 */
-.install-panel {
-  margin-top: 12px;
-  padding: 12px;
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-}
-
-.install-header {
+.lib-identity {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 12px;
 }
 
-.install-header h6 {
-  margin: 0;
-  font-size: 14px;
+.lib-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: white;
+}
+
+.lib-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lib-name {
+  font-size: 15px;
   font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.lib-version {
+  font-size: 12px;
+  color: #6b7280;
+  font-family: 'Monaco', 'Menlo', monospace;
+  background: #f3f4f6;
+  padding: 1px 4px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.features-compact {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.features-compact .el-tag {
+  font-size: 11px;
+  height: 18px;
+  line-height: 16px;
+}
+
+.info-actions {
+  display: flex;
+  gap: 4px;
+}
+
+/* 对话框样式 */
+.install-content {
+  padding: 4px 0;
+}
+
+.package-manager-select {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.package-manager-select .label {
+  font-size: 14px;
   color: #374151;
+  font-weight: 500;
+}
+
+.command-section {
+  margin-bottom: 16px;
 }
 
 .command-display {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  margin-bottom: 8px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
 }
 
 .command-display code {
   flex: 1;
-  font-family: monospace;
+  font-family: 'Monaco', 'Menlo', monospace;
   font-size: 13px;
   color: #1e293b;
   background: none;
   border: none;
 }
 
-.feature-info {
+/* 特性提醒 */
+.feature-notice {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px;
+  gap: 8px;
+  padding: 10px 12px;
   background: #fef3c7;
   border: 1px solid #fde68a;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
-.warning-icon {
-  font-size: 14px;
+.notice-icon {
+  font-size: 16px;
   color: #f59e0b;
   flex-shrink: 0;
 }
 
-.warning-text {
-  font-size: 12px;
+.notice-text {
+  font-size: 13px;
   color: #92400e;
   line-height: 1.4;
 }
 
-/* 文档内容样式 */
-.documentation-content {
+/* 文档内容 */
+.doc-content {
   max-height: 400px;
   overflow-y: auto;
 }
 
-.doc-section {
-  margin-bottom: 20px;
-}
-
-.doc-section h5 {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-  margin: 0 0 10px 0;
-}
-
 .doc-notes {
-  margin: 0;
+  margin: 0 0 20px 0;
   padding-left: 20px;
 }
 
 .doc-notes li {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 14px;
   color: #6b7280;
   line-height: 1.5;
@@ -481,33 +668,79 @@ export default {
   gap: 8px;
 }
 
+.doc-links h6 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  margin: 0 0 8px 0;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
-  .selector-container {
+  .selector-header {
+    justify-content: center;
+    padding: 16px;
+  }
+  
+  .switcher-container {
     flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
+    gap: 12px;
+    align-items: center;
   }
   
   .quick-actions {
     margin-left: 0;
+    margin-top: 4px;
+  }
+  
+  .library-switcher {
+    max-width: none;
+    gap: 8px;
+  }
+  
+  .library-tab {
+    min-width: 70px;
+    padding: 10px 8px 8px 8px;
+  }
+  
+  .tab-label {
+    font-size: 10px;
+  }
+  
+  .current-library-info {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .info-actions {
     justify-content: center;
   }
-  
-  .library-select {
-    min-width: auto;
-    width: 100%;
+}
+
+/* 紧凑模式 */
+@media (max-width: 480px) {
+  .library-tab {
+    min-width: 60px;
+    padding: 8px 6px 6px 6px;
   }
   
-  .install-header {
-    flex-direction: column;
-    gap: 8px;
-    align-items: stretch;
+  .tab-label {
+    display: none;
   }
   
-  .command-display {
-    flex-direction: column;
-    gap: 8px;
+  .tab-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+  
+  .header-title {
+    font-size: 13px;
+  }
+  
+  .quick-actions {
+    margin-top: 8px;
   }
 }
 </style>
