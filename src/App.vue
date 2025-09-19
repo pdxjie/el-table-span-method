@@ -52,12 +52,7 @@
         
         <!-- 顶部功能按钮 -->
         <div class="header-actions">
-          <button class="help-btn" @click="restartGuide" title="重新查看新手引导">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
-            </svg>
-            新手引导
-          </button>
+          <!-- 可以在这里添加其他功能按钮 -->
         </div>
       </div>
     </header>
@@ -189,15 +184,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 新手引导组件 -->
-    <UserGuide 
-      @close="handleGuideClose" 
-      @complete="handleGuideComplete"
-      @load-sample-data="handleLoadSampleData"
-      @switch-tab="handleSwitchTab"
-      @reset-state="handleResetState"
-    />
   </div>
 </template>
 
@@ -208,7 +194,6 @@ import ConfigPanel from './components/ConfigPanel.vue'
 import UniversalTablePreview from './components/UniversalTablePreview.vue'
 import CodeGenerator from './components/CodeGenerator.vue'
 import UILibrarySelector from './components/UILibrarySelector.vue'
-import UserGuide from './components/UserGuide.vue'
 import { generateSpanMethod } from './utils/spanMethod.js'
 import { uiLibraryManager } from './adapters/UILibraryManager.js'
 
@@ -219,7 +204,6 @@ export default {
     UniversalTablePreview,
     CodeGenerator,
     UILibrarySelector,
-    UserGuide,
     View,
     Document,
     Menu
@@ -250,71 +234,6 @@ export default {
     const hideGithubPromo = () => {
       showGithubPromo.value = false
     }
-
-    // 新手引导相关处理
-    const handleGuideClose = () => {
-      console.log('用户关闭了新手引导')
-    }
-
-    const handleGuideComplete = () => {
-      console.log('用户完成了新手引导')
-      // 可以在这里添加完成引导后的逻辑，比如显示欢迎消息
-    }
-
-    // 重新启动引导
-    const restartGuide = () => {
-      localStorage.removeItem('table-wiz-guide-completed')
-      // 通知UserGuide组件重新开始
-      // 这里我们需要给UserGuide组件添加一个ref来调用方法
-      location.reload() // 简单的方式：刷新页面
-    }
-
-    // 处理加载示例数据
-    const handleLoadSampleData = () => {
-      console.log('加载示例数据')
-      // 这里应该调用ConfigPanel的loadSampleData方法
-      // 我们需要获取ConfigPanel的引用
-      const sampleData = [
-        { department: '技术部', name: '张三', position: '前端工程师', salary: 8000 },
-        { department: '技术部', name: '李四', position: '后端工程师', salary: 9000 },
-        { department: '技术部', name: '王五', position: 'UI设计师', salary: 7000 },
-        { department: '销售部', name: '赵六', position: '销售经理', salary: 10000 },
-        { department: '销售部', name: '钱七', position: '销售专员', salary: 6000 }
-      ]
-      
-      tableData.value = sampleData
-      
-      // 设置默认合并配置
-      spanConfig.value = {
-        mergeType: 'row',
-        mergeColumns: ['department'],
-        mergeCondition: 'same',
-        customRule: ''
-      }
-      
-      // 切换到预览页面
-      activeTab.value = 'preview'
-    }
-
-    // 处理切换标签页
-    const handleSwitchTab = (tab) => {
-      console.log('切换标签页:', tab)
-      activeTab.value = tab
-    }
-
-    // 处理重置状态
-    const handleResetState = () => {
-      console.log('重置状态')
-      tableData.value = []
-      spanConfig.value = {
-        mergeType: 'row',
-        mergeColumns: [],
-        mergeCondition: 'same',
-        customRule: ''
-      }
-      activeTab.value = 'preview'
-      currentLibrary.value = 'element-plus'
-    } // 添加当前UI库状态
 
     const handleDataChange = (data) => {
       tableData.value = data
@@ -525,13 +444,7 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
       handleLibraryChange,
       handleSpanMethod,
       toggleLayout,
-      hideGithubPromo,
-      handleGuideClose,
-      handleGuideComplete,
-      restartGuide,
-      handleLoadSampleData,
-      handleSwitchTab,
-      handleResetState
+      hideGithubPromo
     }
   }
 }
@@ -579,38 +492,6 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.help-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border: 1px solid #e5e7eb;
-  background: white;
-  color: #374151;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-}
-
-.help-btn:hover {
-  background: #f9fafb;
-  border-color: #d1d5db;
-  color: #111827;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.help-btn svg {
-  transition: transform 0.2s ease;
-}
-
-.help-btn:hover svg {
-  transform: scale(1.1);
 }
 
 /* GitHub推广浮动卡片样式 */
@@ -1115,11 +996,6 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
     padding: 12px 20px;
   }
   
-  .help-btn {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-  
   .github-promotion-float {
     bottom: 20px;
     right: 20px;
@@ -1166,17 +1042,6 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
 
   .brand-text .tagline {
     display: none;
-  }
-  
-  .help-btn {
-    padding: 5px 10px;
-    font-size: 11px;
-    gap: 4px;
-  }
-  
-  .help-btn svg {
-    width: 14px;
-    height: 14px;
   }
   
   .github-promotion-float {
@@ -1252,17 +1117,6 @@ const spanMethod = ({ row, column, rowIndex, columnIndex }) => {
   .header-actions {
     align-self: flex-end;
     margin-top: -8px;
-  }
-
-  .help-btn {
-    padding: 4px 8px;
-    font-size: 10px;
-    gap: 3px;
-  }
-
-  .help-btn svg {
-    width: 12px;
-    height: 12px;
   }
 
   .github-promotion-float {
