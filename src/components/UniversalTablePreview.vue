@@ -62,9 +62,35 @@
             <!-- 合并列组 -->
             <el-table-column
               v-if="mergedColumnGroup.length > 0"
-              :label="getMergedColumnGroupLabel()"
               align="center"
             >
+              <!-- 自定义表头插槽 -->
+              <template #header>
+                <div class="editable-header-wrapper">
+                  <!-- 编辑模式 -->
+                  <el-input
+                    v-if="isEditingHeader"
+                    ref="headerInputRef"
+                    v-model="customHeaderLabel"
+                    size="small"
+                    @blur="finishEditHeader"
+                    @keydown="handleHeaderKeydown"
+                    class="header-input"
+                    placeholder="请输入表头名称"
+                  />
+                  <!-- 显示模式 -->
+                  <div
+                    v-else
+                    class="editable-header-label"
+                    @click="startEditHeader"
+                    :title="'点击编辑表头名称'"
+                  >
+                    {{ getMergedColumnGroupLabel() }}
+                    <el-icon class="edit-icon"><Edit /></el-icon>
+                  </div>
+                </div>
+              </template>
+
               <el-table-column
                 v-for="field in mergedColumnGroup"
                 :key="field"
@@ -117,7 +143,111 @@
           </template>
         </el-table>
 
-        <!-- 其他UI库的表格组件 - 仅在对应库加载后渲染 -->
+        <!-- Ant Design Vue 表格 -->
+        <a-table
+          v-else-if="currentLibrary === 'ant-design-vue'"
+          :data-source="processedTableData"
+          :bordered="spanConfig.showBorder"
+          :pagination="false"
+          :scroll="{ x: 'max-content' }"
+          size="middle"
+          class="preview-table"
+        >
+          <!-- 列合并或混合合并模式 -->
+          <template v-if="spanConfig.mergeType === 'column' || spanConfig.mergeType === 'mixed'">
+            <!-- 合并列组 -->
+            <a-table-column-group
+              v-if="mergedColumnGroup.length > 0"
+              align="center"
+            >
+              <!-- 自定义表头 -->
+              <template #title>
+                <div class="editable-header-wrapper">
+                  <!-- 编辑模式 -->
+                  <input
+                    v-if="isEditingHeader"
+                    ref="headerInputRef"
+                    v-model="customHeaderLabel"
+                    @blur="finishEditHeader"
+                    @keydown="handleHeaderKeydown"
+                    class="antd-header-input"
+                    placeholder="请输入表头名称"
+                  />
+                  <!-- 显示模式 -->
+                  <div
+                    v-else
+                    class="editable-header-label"
+                    @click="startEditHeader"
+                    :title="'点击编辑表头名称'"
+                  >
+                    {{ getMergedColumnGroupLabel() }}
+                    <span class="edit-icon-antd">✏️</span>
+                  </div>
+                </div>
+              </template>
+
+              <!-- 子列 -->
+              <a-table-column
+                v-for="field in mergedColumnGroup"
+                :key="field"
+                :data-index="field"
+                :title="field"
+                :width="getColumnMinWidth(field)"
+                :ellipsis="true"
+              />
+            </a-table-column-group>
+
+            <!-- 非合并列 -->
+            <a-table-column
+              v-for="field in nonMergedColumns"
+              :key="field"
+              :data-index="field"
+              :title="field"
+              :width="getColumnMinWidth(field)"
+              :ellipsis="true"
+              :custom-cell="(record, index) => {
+                if (spanConfig.mergeType === 'mixed' && field === nonMergedColumns[0]) {
+                  return calculateAntdMixedRowSpan(tableData, index, field, spanConfig)
+                }
+                return {}
+              }"
+            />
+          </template>
+
+          <!-- 行合并模式 -->
+          <template v-else>
+            <a-table-column
+              v-for="field in tableFields"
+              :key="field"
+              :data-index="field"
+              :title="field"
+              :width="getColumnMinWidth(field)"
+              :ellipsis="true"
+              :custom-cell="(record, index) => {
+                if (spanConfig.mergeColumns && spanConfig.mergeColumns.includes(field)) {
+                  return calculateAntdCellSpan(tableData, index, field, spanConfig)
+                }
+                return {}
+              }"
+            />
+          </template>
+        </a-table>
+
+        <!-- Naive UI 表格 -->
+        <n-data-table
+          v-else-if="currentLibrary === 'naive-ui'"
+          :data="processedTableData"
+          :columns="naiveColumnsWithSlots"
+          :bordered="spanConfig.showBorder"
+          :striped="spanConfig.stripe"
+          :pagination="false"
+          size="medium"
+          :single-line="false"
+          :scroll-x="tableFields.length > 6 ? 1200 : undefined"
+          class="preview-table"
+        />
+
+        <!-- 其他UI库的表格组件（Vuetify等） -->
         <component
           v-else-if="isCurrentLibraryAvailable && currentLibrary !== 'vuetify'"
           :is="getTableComponent()"
@@ -139,16 +269,38 @@
               <template v-if="spanConfig.mergeType === 'column' || spanConfig.mergeType === 'mixed'">
                 <!-- 第一层表头：合并列组 -->
                 <tr class="vuetify-header-row">
-                  <th 
+                  <th
                     v-if="mergedColumnGroup.length > 0"
-                    :colspan="mergedColumnGroup.length" 
+                    :colspan="mergedColumnGroup.length"
                     class="vuetify-header merged-header"
                   >
-                    {{ getMergedColumnGroupLabel() }}
+                    <!-- 可编辑表头 -->
+                    <div class="editable-header-wrapper">
+                      <!-- 编辑模式 -->
+                      <input
+                        v-if="isEditingHeader"
+                        ref="headerInputRef"
+                        v-model="customHeaderLabel"
+                        @blur="finishEditHeader"
+                        @keydown="handleHeaderKeydown"
+                        class="vuetify-header-input"
+                        placeholder="请输入表头名称"
+                      />
+                      <!-- 显示模式 -->
+                      <div
+                        v-else
+                        class="editable-header-label"
+                        @click="startEditHeader"
+                        :title="'点击编辑表头名称'"
+                      >
+                        {{ getMergedColumnGroupLabel() }}
+                        <el-icon class="edit-icon"><Edit /></el-icon>
+                      </div>
+                    </div>
                   </th>
-                  <th 
-                    v-for="field in nonMergedColumns" 
-                    :key="field" 
+                  <th
+                    v-for="field in nonMergedColumns"
+                    :key="field"
                     :rowspan="2"
                     class="vuetify-header normal-header"
                   >
@@ -268,7 +420,7 @@
 
 <script>
 import { ref, computed, watch, inject, nextTick, h, toRef, onMounted, onBeforeUnmount } from 'vue'
-import { Loading, Refresh, Lock, DCaret, Sort } from '@element-plus/icons-vue'
+import { Loading, Refresh, Lock, DCaret, Sort, Edit } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { uiLibraryManager } from '../adapters/UILibraryManager.js'
 import { message } from 'ant-design-vue'
@@ -296,7 +448,7 @@ export default {
       default: 'element-plus'
     }
   },
-  emits: ['span-method', 'data-change'],
+  emits: ['span-method', 'data-change', 'header-label-change'],
   setup(props, { emit }) {
     // 注入UI库实例
     const antd = inject('$antd', null)
@@ -317,6 +469,11 @@ export default {
     const localTableFields = ref([])
     const tableKey = ref(0) // 用于强制表格重新渲染
     const isDragging = ref(false) // 标记是否正在拖拽操作中
+
+    // 可编辑表头相关状态
+    const customHeaderLabel = ref('') // 自定义表头名称
+    const isEditingHeader = ref(false) // 是否正在编辑表头
+    const headerInputRef = ref(null) // 输入框引用
 
     // 更新本地数据
     watch(() => props.tableData, (newData) => {
@@ -351,9 +508,14 @@ export default {
 
     // 获取合并列组的标签
     const getMergedColumnGroupLabel = () => {
+      // 优先使用自定义名称
+      if (customHeaderLabel.value) {
+        return customHeaderLabel.value
+      }
+
       const mergeColumns = props.spanConfig.mergeColumns || []
       if (mergeColumns.length === 0) return ''
-      
+
       // 根据列名推断分组名称
       const columnGroups = {
         'region,province,city': '地理信息',
@@ -365,10 +527,67 @@ export default {
         'min,max': '范围',
         'address,zipcode': '地址信息'
       }
-      
+
       const key = mergeColumns.join(',')
       return columnGroups[key] || `${mergeColumns[0]}等信息`
     }
+
+    // 表头编辑相关方法
+    const startEditHeader = () => {
+      if (props.spanConfig.mergeType !== 'column' && props.spanConfig.mergeType !== 'mixed') {
+        return // 只在列合并和混合合并模式下允许编辑
+      }
+
+      isEditingHeader.value = true
+      // 如果没有自定义名称，使用当前默认名称
+      if (!customHeaderLabel.value) {
+        customHeaderLabel.value = getMergedColumnGroupLabel()
+      }
+
+      // 聚焦输入框
+      nextTick(() => {
+        if (headerInputRef.value) {
+          headerInputRef.value.focus()
+          headerInputRef.value.select()
+        }
+      })
+    }
+
+    const finishEditHeader = () => {
+      isEditingHeader.value = false
+
+      // 如果输入为空，恢复默认名称
+      if (!customHeaderLabel.value || customHeaderLabel.value.trim() === '') {
+        customHeaderLabel.value = ''
+      }
+
+      // 通知父组件表头名称已更改
+      emit('header-label-change', customHeaderLabel.value)
+
+      ElMessage.success({
+        message: `表头名称已更新为: ${getMergedColumnGroupLabel()}`,
+        duration: 2000
+      })
+    }
+
+    const cancelEditHeader = () => {
+      isEditingHeader.value = false
+      // 恢复之前的值或默认值
+      customHeaderLabel.value = customHeaderLabel.value || ''
+    }
+
+    const handleHeaderKeydown = (event) => {
+      if (event.key === 'Enter') {
+        finishEditHeader()
+      } else if (event.key === 'Escape') {
+        cancelEditHeader()
+      }
+    }
+
+    // 监听合并列变化，重置自定义表头
+    watch(() => props.spanConfig.mergeColumns, () => {
+      customHeaderLabel.value = ''
+    }, { deep: true })
 
     const currentLibraryName = computed(() => {
       const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
@@ -1254,11 +1473,11 @@ export default {
       if (mergeType === 'column' || mergeType === 'mixed') {
         // 列合并或混合合并：创建多层表头结构
         const columns = []
-        
-        // 添加合并列组
+
+        // 添加合并列组（带自定义表头）
         if (mergeColumns.length > 0) {
           columns.push({
-            title: getMergedColumnGroupLabel(),
+            title: getMergedColumnGroupLabel(), // 使用普通 title，Ant Design Vue 会自动响应式更新
             align: 'center',
             children: mergeColumns.map(field => ({
               title: field,
@@ -1355,24 +1574,73 @@ export default {
 
       const fields = Object.keys(localTableData.value[0])
       const { mergeColumns = [], mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
-      
+
       if (mergeType === 'column' || mergeType === 'mixed') {
         // 列合并或混合合并：创建多层表头结构
         const columns = []
-        
-        // 添加合并列组
+
+        // 添加合并列组（使用 title 渲染函数）
         if (mergeColumns.length > 0) {
           columns.push({
-            title: getMergedColumnGroupLabel(),
             key: 'mergedGroup',
             align: 'center',
+            // 使用 title 渲染函数自定义表头
+            title: () => {
+              return h('div', {
+                class: 'editable-header-wrapper',
+                style: { minHeight: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }
+              }, [
+                // 编辑模式
+                isEditingHeader.value
+                  ? h('input', {
+                      ref: (el) => { if (el) headerInputRef.value = el },
+                      value: customHeaderLabel.value,
+                      onInput: (e) => { customHeaderLabel.value = e.target.value },
+                      onBlur: finishEditHeader,
+                      onKeydown: handleHeaderKeydown,
+                      class: 'naive-header-input',
+                      placeholder: '请输入表头名称',
+                      style: {
+                        width: '100%',
+                        maxWidth: '200px',
+                        padding: '6px 12px',
+                        border: '2px solid #3b82f6',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        outline: 'none',
+                        background: 'white'
+                      }
+                    })
+                  : h('div', {
+                      class: 'editable-header-label',
+                      onClick: startEditHeader,
+                      title: '点击编辑表头名称',
+                      style: {
+                        cursor: 'pointer',
+                        padding: '4px 12px',
+                        borderRadius: '4px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s ease'
+                      }
+                    }, [
+                      getMergedColumnGroupLabel(),
+                      h('span', {
+                        class: 'edit-icon-naive',
+                        style: { opacity: '0.5', fontSize: '14px' }
+                      }, ' ✏️')
+                    ])
+              ])
+            },
             children: mergeColumns.map(field => ({
               title: field,
               key: field
             }))
           })
         }
-        
+
         // 添加非合并列
         const nonMergedFields = fields.filter(field => !mergeColumns.includes(field))
         nonMergedFields.forEach(field => {
@@ -1380,7 +1648,7 @@ export default {
             title: field,
             key: field
           }
-          
+
           // 混合合并：对非合并列组的第一列进行行合并
           if (mergeType === 'mixed' && field === nonMergedFields[0]) {
             column.rowSpan = (rowData, rowIndex) => {
@@ -1392,10 +1660,10 @@ export default {
               return spanInfo.colSpan
             }
           }
-          
+
           columns.push(column)
         })
-        
+
         return columns
       } else {
         // 行合并：原有逻辑
@@ -1413,6 +1681,11 @@ export default {
           } : undefined
         }))
       }
+    })
+
+    // Naive UI 带插槽的列配置（用于模板渲染）
+    const naiveColumnsWithSlots = computed(() => {
+      return naiveColumns.value
     })
 
     // Naive UI 混合合并的行合并计算
@@ -2122,6 +2395,7 @@ export default {
       antdColumns,
       calculateAntdMixedRowSpan,
       naiveColumns,
+      naiveColumnsWithSlots,
       calculateNaiveUIMixedRowSpan,
       calculateNaiveUISpan,
       calculateNaiveUIRowSpan,
@@ -2158,6 +2432,15 @@ export default {
       dragMode,
       handleDragModeChange,
       tableKey, // 用于强制表格重新渲染
+      // 可编辑表头相关
+      customHeaderLabel,
+      isEditingHeader,
+      headerInputRef,
+      startEditHeader,
+      finishEditHeader,
+      cancelEditHeader,
+      handleHeaderKeydown,
+      Edit, // 编辑图标
       // 暴露props给模板使用
       spanConfig: toRef(props, 'spanConfig'),
       currentLibrary: toRef(props, 'currentLibrary'),
@@ -2697,5 +2980,145 @@ export default {
 
 .table-container::-webkit-scrollbar-corner {
   background: #f1f5f9;
+}
+
+/* 可编辑表头样式 */
+.editable-header-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  width: 100%;
+}
+
+.editable-header-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  user-select: none;
+  font-weight: 600;
+}
+
+.editable-header-label:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.editable-header-label:hover .edit-icon {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.edit-icon {
+  opacity: 0.5;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  color: #6b7280;
+}
+
+/* Element Plus 表头输入框 */
+.header-input {
+  max-width: 200px;
+}
+
+.header-input :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 2px #3b82f6 !important;
+}
+
+/* Vuetify 表头输入框 */
+.vuetify-header-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 6px 12px;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.vuetify-header-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Ant Design Vue 表头样式 */
+.antd-custom-header-cell {
+  padding: 0 !important;
+}
+
+.antd-header-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 6px 12px;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.antd-header-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.edit-icon-antd,
+.edit-icon-naive {
+  opacity: 0.5;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  margin-left: 4px;
+}
+
+.editable-header-label:hover .edit-icon-antd,
+.editable-header-label:hover .edit-icon-naive {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Naive UI 表头输入框 */
+.naive-header-input {
+  width: 100%;
+  max-width: 200px;
+  padding: 6px 12px;
+  border: 2px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  background: white;
+  transition: all 0.2s ease;
+}
+
+.naive-header-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 表头编辑提示动画 */
+@keyframes pulse-edit {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.editable-header-label .edit-icon {
+  animation: pulse-edit 2s ease-in-out infinite;
+}
+
+.editable-header-label:hover .edit-icon {
+  animation: none;
 }
 </style>
