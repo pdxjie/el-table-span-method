@@ -145,8 +145,7 @@ const tableColumns = computed(() => {
   }
 
   generateVue2Code(config) {
-    const { showBorder, stripe } = config
-    const spanMethodCode = this.generateSpanMethod(config)
+    const { mergeColumns, mergeCondition, customRule, showBorder, stripe, startRow = 0, endRow } = config
 
     return `<template>
   <div class="table-container">
@@ -170,7 +169,8 @@ export default {
     return {
       tableData: [
         // 在这里添加你的数据
-      ]
+      ],
+      mergeColumns: ${JSON.stringify(mergeColumns)}
     }
   },
   computed: {
@@ -179,7 +179,73 @@ export default {
     }
   },
   methods: {
-    ${spanMethodCode.replace(/const /g, '')}
+    createColumns(tableData) {
+      if (tableData.length === 0) return []
+
+      const fields = Object.keys(tableData[0])
+
+      return fields.map(field => ({
+        title: field,
+        key: field,
+        // 使用 Naive UI 官方的 rowSpan 和 colSpan 函数
+        rowSpan: this.mergeColumns.includes(field) ? (rowData, rowIndex) => {
+          const spanInfo = this.calculateNaiveSpanForCell(tableData, rowIndex, field)
+          return spanInfo.rowSpan
+        } : undefined,
+        colSpan: this.mergeColumns.includes(field) ? (rowData, rowIndex) => {
+          const spanInfo = this.calculateNaiveSpanForCell(tableData, rowIndex, field)
+          return spanInfo.colSpan
+        } : undefined
+      }))
+    },
+
+    calculateNaiveSpanForCell(data, rowIndex, column) {
+      const currentValue = data[rowIndex][column]
+      let rowSpan = 1
+      let colSpan = 1
+
+      // 检查是否在合并范围内
+      const startRow = ${startRow}
+      const endRow = ${endRow !== undefined ? endRow : 'data.length - 1'}
+
+      if (rowIndex < startRow || rowIndex > endRow) {
+        return { rowSpan: 1, colSpan: 1 }
+      }
+
+      // 向下计算行合并 - 只在合并范围内
+      const maxIndex = Math.min(endRow, data.length - 1)
+      for (let i = rowIndex + 1; i <= maxIndex; i++) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否为合并区域的第一行 - 只在合并范围内检查
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          // 不是第一行，隐藏这个单元格
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowSpan, colSpan }
+    },
+
+    shouldMerge(value1, value2) {
+      ${mergeCondition === 'custom' && customRule ?
+        `try {
+        return (${customRule})(value1, value2)
+      } catch (error) {
+        console.error('自定义规则执行错误:', error)
+        return value1 === value2
+      }` :
+        'return value1 === value2'
+      }
+    }
   }
 }
 </script>
@@ -695,28 +761,34 @@ const getCustomCellStyle = (row, field, rowIndex, colIndex) => {
   }
 
   generateVue2Code(config) {
-    const { mergeColumns, showBorder, stripe } = config
-    const spanMethodCode = this.generateSpanMethod(config)
+    const { mergeColumns, mergeType, mergeCondition, customRule, showBorder, stripe, startRow = 0, endRow } = config
 
     return `<template>
   <div class="table-container">
-    <v-data-table
-      :items="processedTableData"
-      :headers="tableHeaders"
-      class="elevation-1"
-      :class="{ 'table-bordered': ${showBorder || true}, 'table-striped': ${stripe || false} }"
-    >
-      <!-- 自定义单元格渲染 -->
-      <template v-for="column in mergeColumns" :slot="\`item.\${column}\`" slot-scope="{ item }">
-        <td 
-          v-if="shouldShowCell(item, column)"
-          :class="getCellClass(item, column)"
-          :rowspan="item._merge && item._merge[column] ? item._merge[column].rowspan : 1"
-        >
-          {{ item[column] }}
-        </td>
-      </template>
-    </v-data-table>
+    <!-- 使用自定义表格结构实现完美的合并效果 -->
+    <div class="vuetify-table-wrapper">
+      <table class="vuetify-custom-table" :class="{ 'bordered': ${showBorder || true}, 'striped': ${stripe || false} }">
+        <thead>
+          <tr>
+            <th v-for="field in tableHeaders" :key="field.value" class="vuetify-header">
+              {{ field.title }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, rowIndex) in processedTableData" :key="rowIndex"
+              :class="{ 'striped-row': ${stripe || false} && rowIndex % 2 === 1 }">
+            <td v-for="(field, colIndex) in tableHeaders" :key="field.value"
+                :class="getCustomCellClass(row, field.value, rowIndex, colIndex)"
+                :style="getCustomCellStyle(row, field.value, rowIndex, colIndex)"
+                v-show="shouldShowCustomCell(row, field.value)"
+                class="vuetify-cell">
+              {{ row[field.value] }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
 
@@ -728,7 +800,8 @@ export default {
       tableData: [
         // 在这里添加你的数据
       ],
-      mergeColumns: ${JSON.stringify(mergeColumns)}
+      mergeColumns: ${JSON.stringify(mergeColumns)},
+      mergeType: '${mergeType}'
     }
   },
   computed: {
@@ -737,17 +810,236 @@ export default {
     },
     tableHeaders() {
       if (this.tableData.length === 0) return []
-      
+
       const fields = Object.keys(this.tableData[0])
       return fields.map(field => ({
-        text: field,
+        title: field,
         value: field,
         sortable: true
       }))
     }
   },
   methods: {
-    ${spanMethodCode.replace(/const /g, '')}
+    processDataWithMerge(data) {
+      const processedData = []
+
+      for (let i = 0; i < data.length; i++) {
+        const row = { ...data[i] }
+        row._merge = {}
+
+        this.mergeColumns.forEach(column => {
+          const spanInfo = this.calculateMergeSpan(data, i, column, this.mergeType)
+          row._merge[column] = spanInfo
+        })
+
+        processedData.push(row)
+      }
+
+      return processedData
+    },
+
+    calculateMergeSpan(data, rowIndex, column, mergeType) {
+      const currentValue = data[rowIndex][column]
+      const startRow = ${startRow}
+      const endRow = ${endRow !== undefined ? endRow : 'data.length - 1'}
+
+      // 检查是否在合并范围内
+      if (rowIndex < startRow || rowIndex > endRow) {
+        return { rowspan: 1, colspan: 1, shouldShow: true }
+      }
+
+      if (mergeType === 'row') {
+        return this.calculateRowSpan(data, rowIndex, column, startRow, endRow)
+      } else if (mergeType === 'column') {
+        return this.calculateColSpan(data, rowIndex, column)
+      } else if (mergeType === 'mixed') {
+        return this.calculateMixedSpan(data, rowIndex, column, startRow, endRow)
+      }
+
+      return { rowspan: 1, colspan: 1, shouldShow: true }
+    },
+
+    calculateRowSpan(data, rowIndex, column, startRow, endRow) {
+      const currentValue = data[rowIndex][column]
+      let rowspan = 1
+      let shouldShow = true
+
+      // 向下计算行合并数量
+      const maxIndex = Math.min(endRow, data.length - 1)
+      for (let i = rowIndex + 1; i <= maxIndex; i++) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否应该隐藏（不是合并的第一行）
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          shouldShow = false
+          break
+        } else {
+          break
+        }
+      }
+
+      return { rowspan, colspan: 1, shouldShow }
+    },
+
+    calculateColSpan(data, rowIndex, column) {
+      const currentValue = data[rowIndex][column]
+      const allFields = Object.keys(data[0])
+      const currentFieldIndex = allFields.indexOf(column)
+      let colspan = 1
+      let shouldShow = true
+
+      // 向右计算列合并数量
+      for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!this.mergeColumns.includes(nextField)) break
+
+        if (this.shouldMerge(data[rowIndex][nextField], currentValue)) {
+          colspan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否应该隐藏（不是合并的第一列）
+      for (let i = currentFieldIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!this.mergeColumns.includes(prevField)) break
+
+        if (this.shouldMerge(data[rowIndex][prevField], currentValue)) {
+          shouldShow = false
+          break
+        } else {
+          break
+        }
+      }
+
+      return { rowspan: 1, colspan, shouldShow }
+    },
+
+    calculateMixedSpan(data, rowIndex, column, startRow, endRow) {
+      const currentValue = data[rowIndex][column]
+      const allFields = Object.keys(data[0])
+      const currentFieldIndex = allFields.indexOf(column)
+
+      let rowspan = 1
+      let colspan = 1
+      let shouldShow = true
+
+      // 1. 先计算行合并
+      const maxRowIndex = Math.min(endRow, data.length - 1)
+      for (let i = rowIndex + 1; i <= maxRowIndex; i++) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+
+      // 2. 再计算列合并
+      for (let i = currentFieldIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!this.mergeColumns.includes(nextField)) break
+
+        // 检查这一列的所有相关行是否都有相同值
+        let canMergeColumn = true
+        for (let row = rowIndex; row < rowIndex + rowspan; row++) {
+          if (!this.shouldMerge(data[row][nextField], currentValue)) {
+            canMergeColumn = false
+            break
+          }
+        }
+
+        if (canMergeColumn) {
+          colspan++
+        } else {
+          break
+        }
+      }
+
+      // 3. 检查是否应该隐藏
+      // 检查行方向
+      for (let i = rowIndex - 1; i >= startRow; i--) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          shouldShow = false
+          break
+        } else {
+          break
+        }
+      }
+
+      // 检查列方向（只有在行方向没有隐藏的情况下）
+      if (shouldShow) {
+        for (let i = currentFieldIndex - 1; i >= 0; i--) {
+          const prevField = allFields[i]
+          if (!this.mergeColumns.includes(prevField)) break
+
+          if (this.shouldMerge(data[rowIndex][prevField], currentValue)) {
+            shouldShow = false
+            break
+          } else {
+            break
+          }
+        }
+      }
+
+      return { rowspan, colspan, shouldShow }
+    },
+
+    shouldMerge(value1, value2) {
+      ${mergeCondition === 'custom' && customRule ?
+        `try {
+        return (${customRule})(value1, value2)
+      } catch (error) {
+        console.error('自定义规则执行错误:', error)
+        return value1 === value2
+      }` :
+        'return value1 === value2'
+      }
+    },
+
+    // 自定义表格合并方法
+    shouldShowCustomCell(row, field) {
+      const mergeInfo = row._merge && row._merge[field]
+      return !mergeInfo || mergeInfo.shouldShow
+    },
+
+    getCustomCellClass(row, field, rowIndex, colIndex) {
+      const mergeInfo = row._merge && row._merge[field]
+      let classes = []
+
+      if (mergeInfo && mergeInfo.shouldShow && mergeInfo.rowspan > 1) {
+        classes.push('merged-cell-custom')
+        classes.push(\`rowspan-\${mergeInfo.rowspan}\`)
+      }
+
+      return classes.join(' ')
+    },
+
+    getCustomCellStyle(row, field, rowIndex, colIndex) {
+      const mergeInfo = row._merge && row._merge[field]
+
+      if (mergeInfo && mergeInfo.shouldShow && mergeInfo.rowspan > 1) {
+        const rowHeight = 48
+        const borderHeight = mergeInfo.rowspan - 1
+        const totalHeight = rowHeight * mergeInfo.rowspan + borderHeight
+
+        return {
+          height: \`\${totalHeight}px\`,
+          verticalAlign: 'middle',
+          textAlign: 'center',
+          position: 'relative',
+          zIndex: 10
+        }
+      }
+
+      return {}
+    }
   }
 }
 </script>
@@ -757,33 +1049,86 @@ export default {
   padding: 20px;
 }
 
-.merged-cell {
-  vertical-align: middle !important;
-  text-align: center !important;
-  position: relative;
+/* Vuetify 自定义表格样式 */
+.vuetify-table-wrapper {
+  width: 100%;
+  overflow: auto;
+  border-radius: 8px;
 }
 
-/* Vuetify 表格合并样式 */
-.table-bordered >>> .v-data-table {
+.vuetify-custom-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 14px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.vuetify-custom-table.bordered {
   border: 1px solid #e0e0e0;
 }
 
-.table-bordered >>> .v-data-table .merged-cell {
-  border-bottom: none !important;
+.vuetify-header {
+  background: #f5f5f5;
+  color: #333;
+  font-weight: 600;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+}
+
+.vuetify-header:last-child {
+  border-right: none;
+}
+
+.vuetify-custom-table.bordered .vuetify-header {
+  border-right: 1px solid #e0e0e0;
+}
+
+.vuetify-cell {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  border-right: 1px solid #e0e0e0;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.vuetify-cell:last-child {
+  border-right: none;
+}
+
+.vuetify-custom-table.bordered .vuetify-cell {
+  border-right: 1px solid #e0e0e0;
+}
+
+/* 合并单元格特殊样式 */
+.merged-cell-custom {
+  background: #fafafa !important;
+  font-weight: 500;
+  border-bottom: 1px solid #e0e0e0 !important;
   vertical-align: middle !important;
   text-align: center !important;
 }
 
-.table-bordered >>> .v-data-table tbody tr td.merged-cell {
-  border-bottom: 1px solid transparent !important;
+/* 条纹效果 */
+.striped-row .vuetify-cell {
+  background-color: #f9f9f9;
 }
 
-.table-bordered >>> .v-data-table tbody tr td.merged-cell:not([rowspan="1"]) {
-  border-bottom: 1px solid #e0e0e0 !important;
+.striped-row .merged-cell-custom {
+  background-color: #f0f0f0 !important;
 }
 
-.table-striped >>> .v-data-table tbody tr:nth-child(odd) {
-  background-color: #f5f5f5;
+/* 悬停效果 */
+.vuetify-custom-table tbody tr:hover .vuetify-cell {
+  background-color: #f0f8ff;
+}
+
+.vuetify-custom-table tbody tr:hover .merged-cell-custom {
+  background-color: #e6f3ff !important;
 }
 </style>`
   }

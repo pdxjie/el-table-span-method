@@ -132,8 +132,7 @@ ${spanMethodCode}
   }
 
   generateVue2Code(config) {
-    const { mergeColumns, showBorder, stripe } = config
-    const spanMethodCode = this.generateSpanMethod(config)
+    const { mergeColumns, mergeType, mergeCondition, customRule, showBorder, stripe } = config
 
     return `<template>
   <div class="table-container">
@@ -162,7 +161,9 @@ export default {
     return {
       tableData: [
         // 在这里添加你的数据
-      ]
+      ],
+      mergeColumns: ${JSON.stringify(mergeColumns)},
+      mergeType: '${mergeType}'
     }
   },
   computed: {
@@ -172,7 +173,152 @@ export default {
     }
   },
   methods: {
-    ${spanMethodCode.replace('const spanMethod', 'spanMethod').replace('const calculateRowSpan', 'calculateRowSpan').replace('const shouldMerge', 'shouldMerge')}
+    spanMethod({ row, column, rowIndex, columnIndex }) {
+      if (!this.mergeColumns.includes(column.property)) {
+        return { rowspan: 1, colspan: 1 }
+      }
+
+      if (this.mergeType === 'row') {
+        return this.calculateRowSpan({ row, column, rowIndex, columnIndex })
+      } else if (this.mergeType === 'column') {
+        return this.calculateColumnSpan({ row, column, rowIndex, columnIndex })
+      } else if (this.mergeType === 'mixed') {
+        return this.calculateMixedSpan({ row, column, rowIndex, columnIndex })
+      }
+
+      return { rowspan: 1, colspan: 1 }
+    },
+
+    calculateRowSpan({ row, column, rowIndex, columnIndex }) {
+      const currentValue = row[column.property]
+      let rowspan = 1
+      let colspan = 1
+
+      // 向下扫描：计算相同值的连续行数
+      for (let i = rowIndex + 1; i < this.tableData.length; i++) {
+        if (this.shouldMerge(this.tableData[i][column.property], currentValue)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+
+      // 向上检查：判断是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (this.shouldMerge(this.tableData[i][column.property], currentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowspan, colspan }
+    },
+
+    calculateColumnSpan({ row, column, rowIndex, columnIndex }) {
+      const currentValue = row[column.property]
+      let rowspan = 1
+      let colspan = 1
+      const allFields = this.tableFields
+
+      // 向右扫描：计算相同值的连续列数
+      for (let i = columnIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!this.mergeColumns.includes(nextField)) break
+
+        if (this.shouldMerge(row[nextField], currentValue)) {
+          colspan++
+        } else {
+          break
+        }
+      }
+
+      // 向左检查：判断是否为合并区域的第一列
+      for (let i = columnIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!this.mergeColumns.includes(prevField)) break
+
+        if (this.shouldMerge(row[prevField], currentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowspan, colspan }
+    },
+
+    calculateMixedSpan({ row, column, rowIndex, columnIndex }) {
+      const currentValue = row[column.property]
+      const allFields = this.tableFields
+      let rowspan = 1
+      let colspan = 1
+
+      // 1. 先计算行合并
+      for (let i = rowIndex + 1; i < this.tableData.length; i++) {
+        if (this.shouldMerge(this.tableData[i][column.property], currentValue)) {
+          rowspan++
+        } else {
+          break
+        }
+      }
+
+      // 2. 再计算列合并
+      for (let i = columnIndex + 1; i < allFields.length; i++) {
+        const nextField = allFields[i]
+        if (!this.mergeColumns.includes(nextField)) break
+
+        // 检查这一列的所有相关行是否都有相同值
+        let canMergeColumn = true
+        for (let r = rowIndex; r < rowIndex + rowspan; r++) {
+          if (!this.shouldMerge(this.tableData[r][nextField], currentValue)) {
+            canMergeColumn = false
+            break
+          }
+        }
+
+        if (canMergeColumn) {
+          colspan++
+        } else {
+          break
+        }
+      }
+
+      // 3. 检查是否应该隐藏（向上检查行）
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (this.shouldMerge(this.tableData[i][column.property], currentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+
+      // 检查是否应该隐藏（向左检查列）
+      for (let i = columnIndex - 1; i >= 0; i--) {
+        const prevField = allFields[i]
+        if (!this.mergeColumns.includes(prevField)) break
+
+        if (this.shouldMerge(row[prevField], currentValue)) {
+          return { rowspan: 0, colspan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowspan, colspan }
+    },
+
+    shouldMerge(value1, value2) {
+      ${mergeCondition === 'custom' && customRule ?
+        `try {
+        return (${customRule})(value1, value2)
+      } catch (error) {
+        console.error('自定义规则执行错误:', error)
+        return value1 === value2
+      }` :
+        'return value1 === value2'
+      }
+    }
   }
 }
 </script>
@@ -412,16 +558,15 @@ const shouldMerge = (value1, value2) => {
   }
 
   generateVue2Code(config) {
-    const { mergeColumns, showBorder, stripe } = config
-    const spanMethodCode = this.generateSpanMethod(config)
+    const { mergeColumns, mergeCondition, customRule, showBorder, stripe } = config
 
     return `<template>
   <div class="table-container">
     <a-table
       :data-source="processedTableData"
       :columns="tableColumns"
-      :bordered="${showBorder || true}"
-      :stripe="${stripe || false}"
+      :bordered="${showBorder !== false}"
+      :pagination="false"
       :scroll="{ x: 'max-content' }"
     />
   </div>
@@ -434,7 +579,8 @@ export default {
     return {
       tableData: [
         // 在这里添加你的数据
-      ]
+      ],
+      mergeColumns: ${JSON.stringify(mergeColumns)}
     }
   },
   computed: {
@@ -443,23 +589,85 @@ export default {
     },
     tableColumns() {
       if (this.tableData.length === 0) return []
-      
+
       const fields = Object.keys(this.tableData[0])
-      const mergeColumns = ${JSON.stringify(mergeColumns)}
-      
+
       return fields.map(field => ({
         title: field,
         dataIndex: field,
         key: field,
-        customCell: mergeColumns.includes(field) ? (record) => {
-          const { rowSpan, colSpan } = this.getRowSpanColSpan(record, field)
-          return { rowSpan, colSpan }
+        customCell: this.mergeColumns.includes(field) ? (record) => {
+          return this.getRowSpanColSpan(record, field)
         } : undefined
       }))
     }
   },
   methods: {
-    ${spanMethodCode.replace(/const /g, '')}
+    processDataForMerge(tableData) {
+      const processedData = []
+
+      for (let i = 0; i < tableData.length; i++) {
+        const row = { ...tableData[i] }
+
+        this.mergeColumns.forEach(column => {
+          const spanInfo = this.calculateSpanForRow(tableData, i, column)
+          row[\`\${column}_rowSpan\`] = spanInfo.rowSpan
+          row[\`\${column}_colSpan\`] = spanInfo.colSpan
+        })
+
+        processedData.push(row)
+      }
+
+      return processedData
+    },
+
+    calculateSpanForRow(data, rowIndex, column) {
+      const currentValue = data[rowIndex][column]
+      let rowSpan = 1
+      let colSpan = 1
+
+      // 计算行合并
+      for (let i = rowIndex + 1; i < data.length; i++) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          rowSpan++
+        } else {
+          break
+        }
+      }
+
+      // 检查是否为合并区域的第一行
+      for (let i = rowIndex - 1; i >= 0; i--) {
+        if (this.shouldMerge(data[i][column], currentValue)) {
+          return { rowSpan: 0, colSpan: 0 }
+        } else {
+          break
+        }
+      }
+
+      return { rowSpan, colSpan }
+    },
+
+    getRowSpanColSpan(record, column) {
+      const rowSpan = record[\`\${column}_rowSpan\`] || 1
+      const colSpan = record[\`\${column}_colSpan\`] || 1
+
+      return {
+        rowSpan,
+        colSpan
+      }
+    },
+
+    shouldMerge(value1, value2) {
+      ${mergeCondition === 'custom' && customRule ?
+        `try {
+        return (${customRule})(value1, value2)
+      } catch (error) {
+        console.error('自定义规则执行错误:', error)
+        return value1 === value2
+      }` :
+        'return value1 === value2'
+      }
+    }
   }
 }
 </script>

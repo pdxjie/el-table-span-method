@@ -691,14 +691,6 @@ export default {
           message: `✅ 已加载${typeNames[type]}测试数据并自动配置合并参数`,
           duration: 3000
         })
-        
-        // 延迟显示详细信息
-        setTimeout(() => {
-          ElMessage.info({
-            message: `📋 合并类型: ${typeNames[type]} | 合并列: ${mergeConfig.mergeColumns.join(', ')}`,
-            duration: 4000
-          })
-        }, 1000)
       })
     }
 
@@ -854,7 +846,6 @@ export default {
       emit('data-change', sampleData)
       handleConfigChange()
       
-      ElMessage.success('示例数据加载成功')
     }
 
     const handleConfigChange = () => {

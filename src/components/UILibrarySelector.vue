@@ -254,7 +254,6 @@ export default {
         try {
           uiLibraryManager.setCurrentAdapter(libraryId)
           emit('library-change', libraryId)
-          ElMessage.success(`已切换到 ${getLibraryDisplayName(libraryId)}`)
         } catch (error) {
           ElMessage.error('切换UI库失败: ' + error.message)
         }
