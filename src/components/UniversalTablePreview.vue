@@ -15,6 +15,22 @@
       </div>
 
       <div class="header-actions">
+        <!-- 拖拽模式切换 -->
+        <el-radio-group v-model="dragMode" size="small" @change="handleDragModeChange">
+          <el-radio-button label="none">
+            <el-icon><Lock /></el-icon>
+            <span>禁止拖拽</span>
+          </el-radio-button>
+          <el-radio-button label="column">
+            <el-icon><DCaret /></el-icon>
+            <span>列拖拽</span>
+          </el-radio-button>
+          <el-radio-button label="row">
+            <el-icon><Sort /></el-icon>
+            <span>行拖拽</span>
+          </el-radio-button>
+        </el-radio-group>
+
         <el-button
           size="small"
           :icon="Refresh"
@@ -32,6 +48,7 @@
         <!-- Element Plus 表格 -->
         <el-table
           v-if="currentLibrary === 'element-plus'"
+          :key="tableKey"
           :data="processedTableData"
           :span-method="spanMethod"
           :border="spanConfig.showBorder"
@@ -250,16 +267,20 @@
 </template>
 
 <script>
-import { ref, computed, watch, inject, nextTick, h, toRef } from 'vue'
-import { Loading, Refresh } from '@element-plus/icons-vue'
+import { ref, computed, watch, inject, nextTick, h, toRef, onMounted, onBeforeUnmount } from 'vue'
+import { Loading, Refresh, Lock, DCaret, Sort } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { uiLibraryManager } from '../adapters/UILibraryManager.js'
 import { message } from 'ant-design-vue'
+import Sortable from 'sortablejs'
 
 export default {
   name: 'UniversalTablePreview',
   components: {
-    Loading
+    Loading,
+    Lock,
+    DCaret,
+    Sort
   },
   props: {
     tableData: {
@@ -275,7 +296,7 @@ export default {
       default: 'element-plus'
     }
   },
-  emits: ['span-method'],
+  emits: ['span-method', 'data-change'],
   setup(props, { emit }) {
     // 注入UI库实例
     const antd = inject('$antd', null)
@@ -288,9 +309,28 @@ export default {
     const libraryLoadError = ref('')
     const availableLibraries = ref(new Set(['element-plus', 'ant-design-vue', 'naive-ui', 'vuetify']))
 
+    // 拖拽相关状态
+    const dragMode = ref('none') // 'none' | 'column' | 'row'
+    const columnSortable = ref(null)
+    const rowSortable = ref(null)
+    const localTableData = ref([...props.tableData])
+    const localTableFields = ref([])
+    const tableKey = ref(0) // 用于强制表格重新渲染
+    const isDragging = ref(false) // 标记是否正在拖拽操作中
+
+    // 更新本地数据
+    watch(() => props.tableData, (newData) => {
+      localTableData.value = [...newData]
+      // 数据更新时重置字段列表，强制表格重新渲染
+      localTableFields.value = []
+      tableKey.value++
+    }, { deep: true, immediate: true })
+
     const tableFields = computed(() => {
-      if (props.tableData.length === 0) return []
-      return Object.keys(props.tableData[0])
+      if (localTableData.value.length === 0) return []
+      return localTableFields.value.length > 0
+        ? localTableFields.value
+        : Object.keys(localTableData.value[0])
     })
 
     // 合并列组和非合并列的计算属性
@@ -359,7 +399,7 @@ export default {
       switch (props.currentLibrary) {
         case 'ant-design-vue':
           return {
-            dataSource: props.tableData, // 使用原始数据，不需要预处理
+            dataSource: localTableData.value, // 使用本地数据
             columns: antdColumns.value,
             bordered: props.spanConfig.showBorder,
             size: 'middle',
@@ -369,7 +409,7 @@ export default {
           }
         case 'naive-ui':
           return {
-            data: props.tableData, // 使用原始数据，不需要预处理
+            data: localTableData.value, // 使用本地数据
             columns: naiveColumns.value,
             bordered: props.spanConfig.showBorder,
             striped: props.spanConfig.stripe,
@@ -439,36 +479,36 @@ export default {
 
     // 获取处理后的表格数据 - 使用适配器统一处理
     const processedTableData = computed(() => {
-      if (!props.tableData || props.tableData.length === 0) {
+      if (!localTableData.value || localTableData.value.length === 0) {
         return []
       }
-      
+
       try {
         // 使用UILibraryManager统一处理数据，但Ant Design Vue不需要预处理
         const adapter = uiLibraryManager.getAdapter(props.currentLibrary)
         if (adapter && typeof adapter.processTableData === 'function' && props.currentLibrary !== 'ant-design-vue') {
-          return adapter.processTableData(props.tableData, props.spanConfig)
+          return adapter.processTableData(localTableData.value, props.spanConfig)
         }
-        
+
         // 降级处理：根据当前UI库类型进行不同的数据处理
         switch (props.currentLibrary) {
           case 'ant-design-vue':
             // Ant Design Vue 按照官方文档，不需要预处理数据
-            return props.tableData
-          
+            return localTableData.value
+
           case 'vuetify':
             // Vuetify 需要添加合并元数据
-            return processVuetifyData(props.tableData, props.spanConfig)
-          
+            return processVuetifyData(localTableData.value, props.spanConfig)
+
           case 'naive-ui':
           case 'element-plus':
           default:
             // Naive UI 和 Element Plus 使用原始数据
-            return props.tableData
+            return localTableData.value
         }
       } catch (error) {
         console.error('处理表格数据时出错:', error)
-        return props.tableData
+        return localTableData.value
       }
     })
 
@@ -1000,27 +1040,27 @@ export default {
       // 对于混合合并，我们基于 department 等字段进行行合并
       const departmentValue = row['department']
       if (!departmentValue) return { rowspan: 1, colspan: 1 }
-      
+
       let rowspan = 1
-      
+
       // 向下查找相同部门的行
-      for (let i = rowIndex + 1; i < props.tableData.length; i++) {
-        if (shouldMerge(props.tableData[i]['department'], departmentValue)) {
+      for (let i = rowIndex + 1; i < localTableData.value.length; i++) {
+        if (shouldMerge(localTableData.value[i]['department'], departmentValue)) {
           rowspan++
         } else {
           break
         }
       }
-      
+
       // 检查是否为合并区域的第一行
       for (let i = rowIndex - 1; i >= 0; i--) {
-        if (shouldMerge(props.tableData[i]['department'], departmentValue)) {
+        if (shouldMerge(localTableData.value[i]['department'], departmentValue)) {
           return { rowspan: 0, colspan: 0 }
         } else {
           break
         }
       }
-      
+
       return { rowspan, colspan: 1 }
     }
 
@@ -1028,25 +1068,25 @@ export default {
       const currentValue = row[column.property]
       let rowspan = 1
       let colspan = 1
-      
+
       // 向下查找相同值
-      for (let i = rowIndex + 1; i < props.tableData.length; i++) {
-        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+      for (let i = rowIndex + 1; i < localTableData.value.length; i++) {
+        if (shouldMerge(localTableData.value[i][column.property], currentValue)) {
           rowspan++
         } else {
           break
         }
       }
-      
+
       // 检查是否为合并区域的第一行
       for (let i = rowIndex - 1; i >= 0; i--) {
-        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+        if (shouldMerge(localTableData.value[i][column.property], currentValue)) {
           return { rowspan: 0, colspan: 0 }
         } else {
           break
         }
       }
-      
+
       return { rowspan, colspan }
     }
 
@@ -1102,54 +1142,54 @@ export default {
       const currentValue = row[column.property]
       let rowspan = 1
       let colspan = 1
-      
+
       // 检查当前列是否在合并列列表中
       if (!mergeColumns.includes(column.property)) {
         return { rowspan: 1, colspan: 1 }
       }
-      
+
       // 1. 先计算行合并
       // 向下查找相同值的行
-      for (let i = rowIndex + 1; i < props.tableData.length; i++) {
-        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+      for (let i = rowIndex + 1; i < localTableData.value.length; i++) {
+        if (shouldMerge(localTableData.value[i][column.property], currentValue)) {
           rowspan++
         } else {
           break
         }
       }
-      
+
       // 检查是否为行合并区域的第一行
       for (let i = rowIndex - 1; i >= 0; i--) {
-        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+        if (shouldMerge(localTableData.value[i][column.property], currentValue)) {
           // 不是第一行，但还需要检查列合并
           break
         } else {
           break
         }
       }
-      
+
       // 2. 再计算列合并（在同一行内）
       const allColumns = tableFields.value
       const currentColIndex = allColumns.indexOf(column.property)
-      
+
       // 向右查找相邻的相同值列
       for (let i = currentColIndex + 1; i < allColumns.length; i++) {
         const nextColumn = allColumns[i]
-        
+
         // 只检查在合并列列表中的列
         if (!mergeColumns.includes(nextColumn)) break
-        
+
         // 检查当前行的这一列是否也有相同值
         if (shouldMerge(row[nextColumn], currentValue)) {
           // 还需要检查涉及到的所有行的这一列是否都有相同值
           let canMergeColumn = true
           for (let r = rowIndex; r < rowIndex + rowspan; r++) {
-            if (!shouldMerge(props.tableData[r][nextColumn], currentValue)) {
+            if (!shouldMerge(localTableData.value[r][nextColumn], currentValue)) {
               canMergeColumn = false
               break
             }
           }
-          
+
           if (canMergeColumn) {
             colspan++
           } else {
@@ -1159,30 +1199,30 @@ export default {
           break
         }
       }
-      
+
       // 3. 检查是否是合并区域的左上角（避免重复渲染）
       // 检查行方向
       for (let i = rowIndex - 1; i >= 0; i--) {
-        if (shouldMerge(props.tableData[i][column.property], currentValue)) {
+        if (shouldMerge(localTableData.value[i][column.property], currentValue)) {
           return { rowspan: 0, colspan: 0 }
         } else {
           break
         }
       }
-      
+
       // 检查列方向
       for (let i = currentColIndex - 1; i >= 0; i--) {
         const prevColumn = allColumns[i]
-        
+
         if (!mergeColumns.includes(prevColumn)) break
-        
+
         if (shouldMerge(row[prevColumn], currentValue)) {
           return { rowspan: 0, colspan: 0 }
         } else {
           break
         }
       }
-      
+
       return { rowspan, colspan }
     }
 
@@ -1206,9 +1246,9 @@ export default {
 
     // Ant Design Vue 列配置 - 按照官方文档实现
     const antdColumns = computed(() => {
-      if (props.tableData.length === 0) return []
-      
-      const fields = Object.keys(props.tableData[0])
+      if (localTableData.value.length === 0) return []
+
+      const fields = Object.keys(localTableData.value[0])
       const { mergeColumns = [], mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
       
       if (mergeType === 'column' || mergeType === 'mixed') {
@@ -1311,9 +1351,9 @@ export default {
 
     // Naive UI 列配置 - 使用官方 rowSpan 和 colSpan 函数
     const naiveColumns = computed(() => {
-      if (props.tableData.length === 0) return []
-      
-      const fields = Object.keys(props.tableData[0])
+      if (localTableData.value.length === 0) return []
+
+      const fields = Object.keys(localTableData.value[0])
       const { mergeColumns = [], mergeType = 'row', mergeCondition = 'same', customRule, startRow = 0, endRow } = props.spanConfig || {}
       
       if (mergeType === 'column' || mergeType === 'mixed') {
@@ -1578,9 +1618,9 @@ export default {
 
     // Vuetify 表头配置
     const vuetifyHeaders = computed(() => {
-      if (props.tableData.length === 0) return []
-      
-      const fields = Object.keys(props.tableData[0])
+      if (localTableData.value.length === 0) return []
+
+      const fields = Object.keys(localTableData.value[0])
       return fields.map(field => ({
         title: field,
         value: field,
@@ -1713,10 +1753,10 @@ export default {
       if (nonMergedFields.length > 0 && field === nonMergedFields[0]) {
         const departmentValue = row['department']
         if (!departmentValue) return true
-        
+
         // 检查是否为合并区域的第一行
         for (let i = rowIndex - 1; i >= 0; i--) {
-          if (props.tableData[i]['department'] === departmentValue) {
+          if (localTableData.value[i]['department'] === departmentValue) {
             return false // 不是第一行，隐藏
           } else {
             break
@@ -1725,25 +1765,25 @@ export default {
       }
       return true
     }
-    
+
     const getVuetifyMixedRowspan = (row, field, rowIndex) => {
       // 对于混合合并，非合并列组中的第一列进行行合并
       const nonMergedFields = nonMergedColumns.value
       if (nonMergedFields.length > 0 && field === nonMergedFields[0]) {
         const departmentValue = row['department']
         if (!departmentValue) return 1
-        
+
         let rowspan = 1
-        
+
         // 向下查找相同部门的行
-        for (let i = rowIndex + 1; i < props.tableData.length; i++) {
-          if (props.tableData[i]['department'] === departmentValue) {
+        for (let i = rowIndex + 1; i < localTableData.value.length; i++) {
+          if (localTableData.value[i]['department'] === departmentValue) {
             rowspan++
           } else {
             break
           }
         }
-        
+
         return rowspan
       }
       return 1
@@ -1793,7 +1833,7 @@ export default {
       // 计算字段名和内容的最大长度
       const maxLength = Math.max(
         field.length,
-        ...props.tableData.map(row => String(row[field] || '').length)
+        ...localTableData.value.map(row => String(row[field] || '').length)
       )
 
       // 根据列数调整最小宽度策略
@@ -1806,6 +1846,219 @@ export default {
         return Math.min(baseWidth, 150) // 限制最大宽度避免过宽
       }
     }
+
+    // 拖拽相关方法
+    // 根据当前 UI 库获取表头选择器
+    const getHeaderSelector = () => {
+      const selectors = {
+        'element-plus': '.el-table__header-wrapper tr',
+        'ant-design-vue': '.ant-table-thead tr',
+        'naive-ui': '.n-data-table-thead tr',
+        'vuetify': '.vuetify-custom-table thead tr' // 使用自定义表格
+      }
+      return selectors[props.currentLibrary] || '.el-table__header-wrapper tr'
+    }
+
+    // 根据当前 UI 库获取表体选择器
+    const getBodySelector = () => {
+      const selectors = {
+        'element-plus': '.el-table__body-wrapper tbody',
+        'ant-design-vue': '.ant-table-tbody',
+        'naive-ui': '.n-data-table-tbody',
+        'vuetify': '.vuetify-custom-table tbody'
+      }
+      return selectors[props.currentLibrary] || '.el-table__body-wrapper tbody'
+    }
+
+    const initColumnDrag = () => {
+      // 对于某些 UI 库，可能需要更多时间来渲染 DOM
+      const attemptInit = (retryCount = 0) => {
+        nextTick(() => {
+          const selector = getHeaderSelector()
+          const el = document.querySelector(selector)
+
+          if (!el) {
+            if (retryCount < 3) {
+              // 重试最多3次，每次延迟增加
+              console.log(`列拖拽初始化重试 ${retryCount + 1}/3，选择器: ${selector}`)
+              setTimeout(() => attemptInit(retryCount + 1), 100 * (retryCount + 1))
+            } else {
+              console.warn(`拖拽初始化失败：未找到表头元素 (${selector})`)
+              console.log('当前 UI 库:', props.currentLibrary)
+              console.log('请在浏览器控制台检查表格的实际 DOM 结构')
+            }
+            return
+          }
+
+          console.log(`✓ 列拖拽已成功初始化 (${props.currentLibrary})`)
+
+          if (columnSortable.value) {
+            columnSortable.value.destroy()
+          }
+
+          columnSortable.value = Sortable.create(el, {
+            animation: 150,
+            onEnd: (evt) => {
+              const { oldIndex, newIndex } = evt
+              if (oldIndex === newIndex) return
+
+              // 标记正在拖拽操作中
+              isDragging.value = true
+
+              // 更新字段顺序
+              const fields = [...tableFields.value]
+              const oldFieldName = fields[oldIndex]
+              const newFieldName = fields[newIndex]
+              const [movedField] = fields.splice(oldIndex, 1)
+              fields.splice(newIndex, 0, movedField)
+
+              // 更新本地字段列表
+              localTableFields.value = fields
+
+              // 重新排列数据列
+              const newData = localTableData.value.map(row => {
+                const newRow = {}
+                fields.forEach(field => {
+                  newRow[field] = row[field]
+                })
+                return newRow
+              })
+
+              localTableData.value = newData
+              emit('data-change', newData)
+            }
+          })
+        })
+      }
+
+      attemptInit()
+    }
+
+    const initRowDrag = () => {
+      // 对于某些 UI 库，可能需要更多时间来渲染 DOM
+      const attemptInit = (retryCount = 0) => {
+        nextTick(() => {
+          const selector = getBodySelector()
+          const el = document.querySelector(selector)
+
+          if (!el) {
+            if (retryCount < 3) {
+              // 重试最多3次，每次延迟增加
+              console.log(`行拖拽初始化重试 ${retryCount + 1}/3，选择器: ${selector}`)
+              setTimeout(() => attemptInit(retryCount + 1), 100 * (retryCount + 1))
+            } else {
+              console.warn(`拖拽初始化失败：未找到表体元素 (${selector})`)
+              console.log('当前 UI 库:', props.currentLibrary)
+              console.log('请在浏览器控制台检查表格的实际 DOM 结构')
+            }
+            return
+          }
+
+          if (rowSortable.value) {
+            rowSortable.value.destroy()
+          }
+
+          rowSortable.value = Sortable.create(el, {
+            animation: 150,
+            onEnd: (evt) => {
+              const { oldIndex, newIndex } = evt
+              if (oldIndex === newIndex) return
+
+              // 标记正在拖拽操作中
+              isDragging.value = true
+
+              const newData = [...localTableData.value]
+              const [movedRow] = newData.splice(oldIndex, 1)
+              newData.splice(newIndex, 0, movedRow)
+
+              localTableData.value = newData
+              emit('data-change', newData)
+            }
+          })
+        })
+      }
+
+      attemptInit()
+    }
+
+    const destroyDrag = () => {
+      if (columnSortable.value) {
+        columnSortable.value.destroy()
+        columnSortable.value = null
+      }
+      if (rowSortable.value) {
+        rowSortable.value.destroy()
+        rowSortable.value = null
+      }
+    }
+
+    const handleDragModeChange = (mode) => {
+      destroyDrag()
+
+      if (mode === 'column') {
+        initColumnDrag()
+      } else if (mode === 'row') {
+        initRowDrag()
+      } else {
+      }
+    }
+
+    // 监听拖拽模式变化
+    watch(dragMode, (newMode) => {
+      handleDragModeChange(newMode)
+    })
+
+    // 监听数据变化，重新初始化拖拽实例
+    watch([localTableData, localTableFields], () => {
+      // 只有在拖拽操作导致的数据变化时才重新初始化
+      if (isDragging.value && dragMode.value !== 'none') {
+        // 等待 DOM 更新完成后重新初始化拖拽
+        nextTick(() => {
+          setTimeout(() => {
+            console.log('数据更新后重新初始化拖拽实例')
+            if (dragMode.value === 'column') {
+              if (columnSortable.value) {
+                columnSortable.value.destroy()
+                columnSortable.value = null
+              }
+              initColumnDrag()
+            } else if (dragMode.value === 'row') {
+              if (rowSortable.value) {
+                rowSortable.value.destroy()
+                rowSortable.value = null
+              }
+              initRowDrag()
+            }
+            // 重置拖拽标记
+            isDragging.value = false
+          }, 100) // 延迟100ms确保DOM完全更新
+        })
+      }
+    }, { deep: true })
+
+    // 监听 UI 库切换，重新初始化拖拽
+    watch(() => props.currentLibrary, (newLibrary, oldLibrary) => {
+      if (newLibrary !== oldLibrary && dragMode.value !== 'none') {
+        // 销毁旧的拖拽实例
+        destroyDrag()
+        // 等待 DOM 更新后重新初始化
+        nextTick(() => {
+          handleDragModeChange(dragMode.value)
+        })
+      }
+    })
+
+    // 组件挂载时初始化
+    onMounted(() => {
+      if (dragMode.value !== 'none') {
+        handleDragModeChange(dragMode.value)
+      }
+    })
+
+    // 组件卸载时销毁拖拽实例
+    onBeforeUnmount(() => {
+      destroyDrag()
+    })
 
     const refreshPreview = () => {
       message.success('这是一个 Demo!')
@@ -1901,6 +2154,10 @@ export default {
       getMergeTypeText,
       tableScrollWidth,
       Refresh,
+      // 拖拽相关
+      dragMode,
+      handleDragModeChange,
+      tableKey, // 用于强制表格重新渲染
       // 暴露props给模板使用
       spanConfig: toRef(props, 'spanConfig'),
       currentLibrary: toRef(props, 'currentLibrary'),

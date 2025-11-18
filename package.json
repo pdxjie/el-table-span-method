@@ -17,6 +17,7 @@
     "monaco-editor": "^0.52.0",
     "naive-ui": "^2.43.1",
     "papaparse": "^5.4.1",
+    "sortablejs": "^1.15.6",
     "vue": "^3.4.29",
     "vuetify": "^3.10.2",
     "xlsx": "^0.18.5"

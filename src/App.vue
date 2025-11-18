@@ -99,6 +99,7 @@
                 :span-config="spanConfig"
                 :current-library="currentLibrary"
                 @span-method="handleSpanMethod"
+                @data-change="handleDataChange"
               />
             </div>
           </el-tab-pane>
